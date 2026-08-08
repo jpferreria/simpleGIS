@@ -42,7 +42,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'SimpleGIS Backend is running', user: req.user || null });
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Start the server only if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
