@@ -159,6 +159,12 @@ function App() {
   // M14 State (Analytics Dashboard)
   const [showDashboard, setShowDashboard] = useState(false);
 
+  // M16 State (Geocoding Search)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchPin, setSearchPin] = useState(null); // [lat, lng]
+
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
       .then(res => res.json())
@@ -566,6 +572,38 @@ function App() {
       .then(() => fetchFeatures());
   };
 
+  // --- M16 Geocoding Logic ---
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`);
+        const data = await res.json();
+        setSearchResults(data);
+      } catch (err) {
+        console.error("Geocoding failed:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const handleSelectSearchResult = (result) => {
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    setSearchPin([lat, lon]);
+    setSearchQuery('');
+    setSearchResults([]);
+    setJumpTo([lat, lon]);
+  };
+
   // --- M15 Spatial Buffering ---
   const generateBuffer = async (feature) => {
     try {
@@ -745,6 +783,36 @@ function App() {
         </div>
       )}
       
+      {/* Geocoding Search Bar */}
+      <div className="absolute top-4 right-4 z-[1000] w-72 flex flex-col gap-1">
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl flex items-center px-3 py-2 transition-all focus-within:border-blue-500/50">
+          <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search for places..."
+            className="bg-transparent border-none outline-none text-xs text-white placeholder-white/40 ml-2 w-full"
+          />
+          {isSearching && <div className="w-3 h-3 rounded-full border-2 border-blue-500 border-t-transparent animate-spin ml-2"></div>}
+        </div>
+        
+        {/* Search Results Dropdown */}
+        {searchResults.length > 0 && (
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden mt-1 flex flex-col max-h-60 overflow-y-auto custom-scrollbar">
+            {searchResults.map((result, idx) => (
+              <button 
+                key={idx} 
+                onClick={() => handleSelectSearchResult(result)}
+                className="text-left px-3 py-2 text-[10px] text-white/80 hover:bg-white/10 hover:text-white transition border-b border-white/5 last:border-b-0 leading-tight"
+              >
+                {result.display_name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Draggable Glassmorphism Toolbar */}
       <Draggable handle=".drag-handle" bounds="parent">
         <header className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-lg border border-white/10 shadow-2xl flex flex-col w-max hover:bg-slate-900/70 transition-colors duration-200">
@@ -1075,6 +1143,15 @@ function App() {
           {routePoints.map((pt, idx) => (
             <Marker key={`rp-${idx}`} position={pt} />
           ))}
+
+          {/* Render Search Pin */}
+          {searchPin && (
+            <Marker position={searchPin}>
+              <Popup className="custom-popup">
+                <div className="text-center font-semibold text-slate-800">Search Result</div>
+              </Popup>
+            </Marker>
+          )}
 
           {/* Render live location */}
           {liveLocation && (
