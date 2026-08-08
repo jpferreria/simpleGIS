@@ -131,20 +131,28 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-50">
-      <header className="bg-gray-800 text-white p-4 shadow-md flex justify-between items-center z-10 relative">
-        <h1 className="text-xl font-bold">SimpleGIS</h1>
-        <div className="flex gap-4">
-          <div className="flex bg-gray-700 rounded overflow-hidden shadow-sm">
-            <button onClick={exportToJSON} className="hover:bg-gray-600 px-3 py-2 text-sm border-r border-gray-600 transition">Export JSON</button>
-            <button onClick={exportToMarkdown} className="hover:bg-gray-600 px-3 py-2 text-sm border-r border-gray-600 transition">Export MD</button>
-            <button onClick={exportToImage} className="hover:bg-gray-600 px-3 py-2 text-sm transition">Export Image</button>
+    <div className="h-screen w-screen flex flex-col bg-slate-900 font-sans">
+      <header className="absolute top-0 left-0 right-0 z-[1000] m-4 px-6 py-4 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl flex justify-between items-center transition-all duration-300 hover:bg-white/15">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-400 flex items-center justify-center shadow-lg">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm rounded font-medium transition">Login with GitHub</button>
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-100 to-white tracking-tight">SimpleGIS</h1>
+        </div>
+        <div className="flex gap-4 items-center">
+          <div className="flex bg-white/5 backdrop-blur-md rounded-lg overflow-hidden border border-white/10 shadow-inner">
+            <button onClick={exportToJSON} className="hover:bg-white/20 text-white/90 px-4 py-2 text-sm font-medium border-r border-white/10 transition-colors duration-200">JSON</button>
+            <button onClick={exportToMarkdown} className="hover:bg-white/20 text-white/90 px-4 py-2 text-sm font-medium border-r border-white/10 transition-colors duration-200">MD</button>
+            <button onClick={exportToImage} className="hover:bg-white/20 text-white/90 px-4 py-2 text-sm font-medium transition-colors duration-200 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+              Snapshot
+            </button>
+          </div>
+          <button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-6 py-2 text-sm rounded-lg font-semibold shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 transform hover:scale-105 active:scale-95">Login</button>
         </div>
       </header>
       <main className="flex-1 relative z-0 flex">
-        <MapContainer center={position} zoom={13} className="h-full w-full" ref={mapRef}>
+        <MapContainer center={position} zoom={13} className="h-full w-full absolute inset-0 z-0" ref={mapRef}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
