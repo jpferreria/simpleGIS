@@ -22,6 +22,13 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const liveLocationIcon = L.divIcon({
+  className: 'custom-location-icon',
+  html: `<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] animate-pulse"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
+});
+
 function GeomanSetup({ onCreated }) {
   const map = useMap();
 
@@ -110,6 +117,11 @@ function App() {
   // M10 State (Routing)
   const [routingMode, setRoutingMode] = useState(false);
   const [routePoints, setRoutePoints] = useState([]);
+
+  // M11 State (Geolocation)
+  const [isTracking, setIsTracking] = useState(false);
+  const [liveLocation, setLiveLocation] = useState(null);
+  const watchIdRef = useRef(null);
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -311,8 +323,53 @@ function App() {
     a.download = "simplegis_export.md";
     document.body.appendChild(a);
     a.click();
-    a.remove();
   };
+
+  const exportToGeoJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(features));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "simplegis_export.geojson");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  // --- M11 Geolocation Logic ---
+  const toggleTracking = () => {
+    if (isTracking) {
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+      setIsTracking(false);
+      setLiveLocation(null);
+      watchIdRef.current = null;
+    } else {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+      const id = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLiveLocation([latitude, longitude]);
+          setJumpTo([latitude, longitude]); // Auto-pan follow mode
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          alert("Unable to retrieve your location.");
+          setIsTracking(false);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+      );
+      watchIdRef.current = id;
+      setIsTracking(true);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, []);
 
   const exportToImage = () => {
     const mapElement = document.querySelector('.leaflet-container');
@@ -574,9 +631,13 @@ function App() {
               </button>
               <button onClick={exportToJSON} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition">JSON</button>
               <button onClick={exportToMarkdown} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition">MD</button>
-              <button onClick={exportToImage} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium transition flex items-center gap-1">
+              <button onClick={exportToImage} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition flex items-center gap-1">
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 Snap
+              </button>
+              <button onClick={toggleTracking} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition flex items-center gap-1 ${isTracking ? 'text-blue-400 bg-blue-500/10' : 'text-white/80'}`}>
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                Locate Me
               </button>
             </div>
               <button onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
@@ -773,6 +834,11 @@ function App() {
           {routePoints.map((pt, idx) => (
             <Marker key={`rp-${idx}`} position={pt} />
           ))}
+
+          {/* Render live location */}
+          {liveLocation && (
+            <Marker position={liveLocation} icon={liveLocationIcon} zIndexOffset={1000} />
+          )}
 
           {visibleFeatures && visibleFeatures.features && visibleFeatures.features.length > 0 && (
             <GeoJSON 
