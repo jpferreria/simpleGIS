@@ -601,7 +601,7 @@ function App() {
     setSearchPin([lat, lon]);
     setSearchQuery('');
     setSearchResults([]);
-    setJumpTo([lat, lon]);
+    setJumpTo({ center: [lat, lon] });
   };
 
   // --- M15 Spatial Buffering ---
