@@ -194,7 +194,7 @@ function App() {
   const [isFetchingElevation, setIsFetchingElevation] = useState(false);
 
   const fetchFeatures = () => {
-    fetch('http://localhost:3001/api/features')
+    fetch('/api/features')
       .then(res => res.json())
       .then(data => {
         if (data.type === 'FeatureCollection') {
@@ -215,7 +215,7 @@ function App() {
         const feature = JSON.parse(decodeURIComponent(featureStr));
         const buffered = turf.buffer(feature, 1, { units: 'kilometers' });
         
-        const response = await fetch('http://localhost:3001/api/features', {
+        const response = await fetch('/api/features', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -256,7 +256,7 @@ function App() {
     }
     
     try {
-      const response = await fetch('http://localhost:3001/api/features', {
+      const response = await fetch('/api/features', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -334,7 +334,7 @@ function App() {
     const handleUpdate = async (e) => {
       const updatedGeoJson = e.target.toGeoJSON();
       try {
-        await fetch(`http://localhost:3001/api/features/${feature.id}`, {
+        await fetch(`/api/features/${feature.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -350,7 +350,7 @@ function App() {
 
     const handleDelete = async () => {
       try {
-        await fetch(`http://localhost:3001/api/features/${feature.id}`, {
+        await fetch(`/api/features/${feature.id}`, {
           method: 'DELETE'
         });
         fetchFeatures();
@@ -459,7 +459,7 @@ function App() {
   };
 
   const handleSaveFeature = async (f) => {
-    await fetch('http://localhost:3001/api/features', {
+    await fetch('/api/features', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -536,7 +536,7 @@ function App() {
 
     // Simulated NLP heuristics
     try {
-      const res = await fetch('http://localhost:3001/api/llm/query', {
+      const res = await fetch('/api/llm/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: userMsg, action: 'chat' })
@@ -563,7 +563,7 @@ function App() {
     if (!editingFeature) return;
 
     try {
-      await fetch(`http://localhost:3001/api/features/${editingFeature.id}`, {
+      await fetch(`/api/features/${editingFeature.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -605,7 +605,7 @@ function App() {
   };
 
   const deleteFeature = (id) => {
-    fetch(`http://localhost:3001/api/features/${id}`, { method: 'DELETE' })
+    fetch(`/api/features/${id}`, { method: 'DELETE' })
       .then(() => fetchFeatures());
   };
 
@@ -674,7 +674,7 @@ function App() {
 
       if (resultFeature) {
         resultFeature.properties.id = crypto.randomUUID();
-        await fetch('http://localhost:3001/api/features', {
+        await fetch('/api/features', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resultFeature)
@@ -727,7 +727,7 @@ function App() {
       // OpenTopoData expects lat,lon format
       const locationsString = sampledCoords.map(c => `${c[1]},${c[0]}`).join('|');
       
-      const response = await fetch('http://localhost:3001/api/elevation', {
+      const response = await fetch('/api/elevation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -766,7 +766,7 @@ function App() {
         description: 'Generated 500m spatial buffer.'
       };
 
-      await fetch('http://localhost:3001/api/features', {
+      await fetch('/api/features', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buffered)
@@ -848,7 +848,7 @@ function App() {
         const distanceKm = (data.routes[0].distance / 1000).toFixed(2);
         const durationMin = (data.routes[0].duration / 60).toFixed(1);
         
-        await fetch('http://localhost:3001/api/features', {
+        await fetch('/api/features', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1010,7 +1010,7 @@ function App() {
                 Metrics
               </button>
             </div>
-              <button onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
+              <button onClick={() => window.location.href = '/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
             </div>
           </div>
           
