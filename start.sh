@@ -1,7 +1,7 @@
 #!/bin/bash
-# Start script for SimpleGIS
+# Start script for LiteGIS
 
-echo "Starting SimpleGIS..."
+echo "Starting LiteGIS..."
 mkdir -p .pids
 
 # Start Backend

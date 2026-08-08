@@ -39,7 +39,7 @@ app.use('/api/features', featureRoutes);
 app.use('/api/llm', llmRoutes);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SimpleGIS Backend is running', user: req.user || null });
+  res.json({ status: 'ok', message: 'LiteGIS Backend is running', user: req.user || null });
 });
 
 // Start the server only if not in test mode

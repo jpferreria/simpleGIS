@@ -1,7 +1,7 @@
 #!/bin/bash
-# Stop script for SimpleGIS
+# Stop script for LiteGIS
 
-echo "Stopping SimpleGIS..."
+echo "Stopping LiteGIS..."
 
 if [ -f .pids/backend.pid ]; then
   BACKEND_PID=$(cat .pids/backend.pid)

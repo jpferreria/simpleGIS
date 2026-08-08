@@ -2,7 +2,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
-describe('SimpleGIS Backend API Tests', () => {
+describe('LiteGIS Backend API Tests', () => {
   
   // Cleanup database after tests
   afterAll((done) => {

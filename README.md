@@ -1,8 +1,8 @@
-# SimpleGIS
+# LiteGIS
 
-A modern, full-stack Geographic Information System (GIS) built with React, Leaflet, and Express. SimpleGIS allows you to draw, analyze, and manage spatial data with a sleek, glassmorphic user interface.
+A modern, full-stack Geographic Information System (GIS) built with React, Leaflet, and Express. LiteGIS allows you to draw, analyze, and manage spatial data with a sleek, glassmorphic user interface.
 
-![SimpleGIS Screenshot](docs/screenshot.jpg)
+![LiteGIS Screenshot](docs/screenshot.jpg)
 
 ## Features
 

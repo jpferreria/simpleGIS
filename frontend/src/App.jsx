@@ -186,6 +186,9 @@ function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchPin, setSearchPin] = useState(null); // [lat, lng]
 
+  // M18 State (Spatial Boolean Ops)
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState([]);
+
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
       .then(res => res.json())
@@ -363,14 +366,14 @@ function App() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(features, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "simplegis_export.geojson");
+    downloadAnchorNode.setAttribute("download", "litegis_export.geojson");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
   };
 
   const exportToMarkdown = () => {
-    let md = "# SimpleGIS Data Export\n\n";
+    let md = "# LiteGIS Data Export\n\n";
     features.features.forEach((f, i) => {
       const name = f.properties?.name || `Feature ${i + 1}`;
       md += `## ${name}\n`;
@@ -387,7 +390,7 @@ function App() {
     const dataStr = "data:text/markdown;charset=utf-8," + encodeURIComponent(md);
     const a = document.createElement('a');
     a.href = dataStr;
-    a.download = "simplegis_export.md";
+    a.download = "litegis_export.md";
     document.body.appendChild(a);
     a.click();
   };
@@ -396,7 +399,7 @@ function App() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(features));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "simplegis_export.geojson");
+    downloadAnchorNode.setAttribute("download", "litegis_export.geojson");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -634,6 +637,53 @@ function App() {
     setJumpTo({ center: [lat, lon] });
   };
 
+  // --- M18 Spatial Boolean Operations ---
+  const handleToggleMultiSelect = (id) => {
+    setSelectedFeatureIds(prev => 
+      prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBooleanOperation = async (operation) => {
+    try {
+      const selectedPolygons = features.features.filter(f => selectedFeatureIds.includes(f.properties.id));
+      
+      if (selectedPolygons.length < 2) return alert("Select at least 2 features.");
+      if (selectedPolygons.some(f => f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon')) {
+        return alert("Boolean operations currently only support Polygons.");
+      }
+
+      let resultFeature = null;
+
+      if (operation === 'intersect') {
+        if (selectedPolygons.length !== 2) return alert("Intersection requires exactly 2 polygons.");
+        resultFeature = turf.intersect(turf.featureCollection([selectedPolygons[0], selectedPolygons[1]]));
+        if (!resultFeature) return alert("Polygons do not intersect!");
+        resultFeature.properties = { name: "Intersection Result", color: "#f59e0b", layerType: 'Polygon' };
+      } else if (operation === 'union') {
+        resultFeature = selectedPolygons[0];
+        for (let i = 1; i < selectedPolygons.length; i++) {
+          resultFeature = turf.union(turf.featureCollection([resultFeature, selectedPolygons[i]]));
+        }
+        resultFeature.properties = { name: "Union Result", color: "#10b981", layerType: 'Polygon' };
+      }
+
+      if (resultFeature) {
+        resultFeature.properties.id = crypto.randomUUID();
+        await fetch('http://localhost:3001/api/features', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resultFeature)
+        });
+        setSelectedFeatureIds([]); // clear selection
+        fetchFeatures();
+      }
+    } catch (e) {
+      console.error("Boolean Operation failed:", e);
+      alert("Operation failed. Ensure your polygons are valid and overlapping correctly.");
+    }
+  };
+
   // --- M15 Spatial Buffering ---
   const generateBuffer = async (feature) => {
     try {
@@ -855,7 +905,7 @@ function App() {
             <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-400 flex items-center justify-center shadow-lg">
               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
-            <h1 className="text-xs font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-100 to-white tracking-tight">SimpleGIS</h1>
+            <h1 className="text-xs font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-100 to-white tracking-tight">LiteGIS</h1>
           </div>
           
           <div className="flex gap-2 items-center">
@@ -928,13 +978,23 @@ function App() {
               return (
                 <div key={f.id} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg group transition">
                   <div className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1" onClick={() => flyToFeature(f)}>
-                    <div className={`w-2 h-2 rounded-full ${typeColor} flex-shrink-0 ${isHidden ? 'opacity-30' : ''}`}></div>
-                    <div className="truncate">
-                      <p className={`text-xs font-medium truncate ${isHidden ? 'text-white/40 line-through' : 'text-white/90'}`}>{name}</p>
-                      <p className="text-[10px] text-white/40 truncate">{f.geometry.type}</p>
+                    <div className="flex items-center justify-center w-6 h-6 rounded bg-white/10 mr-2 text-[10px] text-white/50">
+                      {f.geometry.type === 'Point' ? '•' : f.geometry.type === 'LineString' ? '—' : '⬠'}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <div className="text-sm font-medium truncate">{f.properties?.name || 'Unnamed Feature'}</div>
+                      <div className="text-[10px] text-white/40">{f.geometry.type}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 cursor-pointer w-4 h-4 rounded border-gray-300 bg-gray-100 focus:ring-blue-500" 
+                      title="Select for Boolean Ops"
+                      checked={selectedFeatureIds.includes(f.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => handleToggleMultiSelect(f.id)}
+                    />
                     <button onClick={(e) => { e.stopPropagation(); generateBuffer(f); }} className="p-1 text-white/50 hover:text-purple-400 transition" title="Generate 500m Buffer">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                     </button>
@@ -1235,6 +1295,30 @@ function App() {
 
         </MapContainer>
       </div>
+
+      {/* Boolean Operations Action Bar */}
+      {selectedFeatureIds.length > 1 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/90 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <div className="text-sm text-white/80 font-medium">
+            <span className="text-white font-bold">{selectedFeatureIds.length}</span> Features Selected
+          </div>
+          <div className="h-4 w-px bg-white/20"></div>
+          <button 
+            onClick={() => handleBooleanOperation('intersect')}
+            disabled={selectedFeatureIds.length !== 2}
+            className="px-4 py-1.5 rounded-lg bg-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wide hover:bg-orange-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-orange-500/30"
+          >
+            Intersect
+          </button>
+          <button 
+            onClick={() => handleBooleanOperation('union')}
+            className="px-4 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wide hover:bg-emerald-500/30 transition-colors border border-emerald-500/30"
+          >
+            Union
+          </button>
+        </div>
+      )}
+
       </main>
     </div>
   );
