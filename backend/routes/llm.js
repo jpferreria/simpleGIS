@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const MODEL = 'gemma:e4b';
+const MODEL = 'gemma4:e4b';
 
 // Helper to query the DB synchronously for the LLM context
 const getMapFeatures = () => {

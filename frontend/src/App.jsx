@@ -12,6 +12,7 @@ import 'leaflet/dist/leaflet.css';
 // Geoman for drawing
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
+import Draggable from 'react-draggable';
 
 let DefaultIcon = L.icon({
     iconUrl: icon,
@@ -66,12 +67,31 @@ function GeomanSetup({ onCreated }) {
   return null;
 }
 
-import Draggable from 'react-draggable';
+// Helper component to jump map to bounds
+function MapController({ jumpTo }) {
+  const map = useMap();
+  useEffect(() => {
+    if (jumpTo) {
+      if (jumpTo.bounds) {
+        map.flyToBounds(jumpTo.bounds, { padding: [50, 50], duration: 1.5 });
+      } else if (jumpTo.center) {
+        map.flyTo(jumpTo.center, 15, { duration: 1.5 });
+      }
+    }
+  }, [jumpTo, map]);
+  return null;
+}
 
 function App() {
   const position = [51.505, -0.09]; // Default to London
   const [features, setFeatures] = useState({ type: 'FeatureCollection', features: [] });
   const mapRef = useRef(null);
+
+  // M8 State
+  const [hiddenFeatureIds, setHiddenFeatureIds] = useState(new Set());
+  const [editingFeature, setEditingFeature] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [jumpTo, setJumpTo] = useState(null);
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -88,7 +108,7 @@ function App() {
     fetchFeatures();
   }, []);
 
-  // Set up global function for the popup buttons
+  // Set up global functions for the popup buttons
   useEffect(() => {
     window.generateBuffer = async (featureStr) => {
       try {
@@ -101,7 +121,7 @@ function App() {
           body: JSON.stringify({
             type: 'Feature',
             geometry: buffered.geometry,
-            properties: { layerType: 'Polygon', isBuffer: true, parentId: feature.id }
+            properties: { layerType: 'Polygon', isBuffer: true, parentId: feature.id, name: 'Buffer Zone' }
           })
         });
         
@@ -112,9 +132,15 @@ function App() {
         console.error("Error generating buffer:", err);
       }
     };
+
+    window.editFeature = (featureStr) => {
+      const feature = JSON.parse(decodeURIComponent(featureStr));
+      setEditingFeature(feature);
+    };
     
     return () => {
       delete window.generateBuffer;
+      delete window.editFeature;
     };
   }, [features]);
 
@@ -136,7 +162,7 @@ function App() {
         body: JSON.stringify({
           type: 'Feature',
           geometry: geojson.geometry,
-          properties: { layerType }
+          properties: { layerType, name: `New ${layerType}` }
         })
       });
       if (response.ok) {
@@ -149,7 +175,13 @@ function App() {
   };
 
   const onEachFeature = (feature, layer) => {
-    let popupContent = `<b>Feature Type:</b> ${feature.geometry.type}<br/>`;
+    let popupContent = `<b>${feature.properties?.name || 'Unnamed Feature'}</b><br/>`;
+    
+    if (feature.properties?.description) {
+      popupContent += `<p style="margin:4px 0; font-size:12px; color:#555;">${feature.properties.description}</p>`;
+    } else {
+      popupContent += `<p style="margin:4px 0; font-size:12px; color:#999;"><i>No description</i></p>`;
+    }
 
     if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
       const area = turf.area(feature); // Area in square meters
@@ -170,18 +202,27 @@ function App() {
     }
 
     const featureStr = encodeURIComponent(JSON.stringify(feature));
-    const buttonHtml = `<button onclick="window.generateBuffer('${featureStr}')" style="margin-top: 8px; padding: 6px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-family: Inter, sans-serif; font-size: 12px; width: 100%; font-weight: 500;">Generate 1km Buffer</button>`;
+    const btnStyle = "margin-top: 6px; padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-family: Inter, sans-serif; font-size: 11px; width: 100%; font-weight: 500; transition: opacity 0.2s;";
     
-    popupContent += buttonHtml;
+    const bufferBtn = `<button onclick="window.generateBuffer('${featureStr}')" style="${btnStyle} background: #3b82f6; color: white; margin-bottom: 4px;">Generate 1km Buffer</button>`;
+    const editBtn = `<button onclick="window.editFeature('${featureStr}')" style="${btnStyle} background: #64748b; color: white;">Edit Properties</button>`;
+    
+    popupContent += bufferBtn + editBtn;
 
     layer.bindPopup(popupContent);
     
+    // Apply styling based on properties
     if (feature.properties && feature.properties.isBuffer && layer.setStyle) {
       layer.setStyle({
         color: '#10b981',
         fillColor: '#10b981',
         fillOpacity: 0.2,
         dashArray: '5, 5'
+      });
+    } else if (feature.properties?.color && layer.setStyle) {
+      layer.setStyle({
+        color: feature.properties.color,
+        fillColor: feature.properties.color
       });
     }
 
@@ -197,6 +238,7 @@ function App() {
             properties: feature.properties
           })
         });
+        fetchFeatures();
       } catch (err) {
         console.error("Error updating feature:", err);
       }
@@ -207,6 +249,7 @@ function App() {
         await fetch(`http://localhost:3001/api/features/${feature.id}`, {
           method: 'DELETE'
         });
+        fetchFeatures();
       } catch (err) {
         console.error("Error deleting feature:", err);
       }
@@ -221,20 +264,36 @@ function App() {
   // Export functions
   const exportToJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(features, null, 2));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", "map_data.json");
-    dlAnchorElem.click();
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "simplegis_export.geojson");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
   };
 
   const exportToMarkdown = () => {
-    const featureCount = features.features.length;
-    const mdContent = `# SimpleGIS Data Summary\n\n- **Total Features**: ${featureCount}\n- **Exported**: ${new Date().toLocaleString()}\n\n## Data Details\n\`\`\`json\n${JSON.stringify(features, null, 2)}\n\`\`\``;
-    const dataStr = "data:text/markdown;charset=utf-8," + encodeURIComponent(mdContent);
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", "map_report.md");
-    dlAnchorElem.click();
+    let md = "# SimpleGIS Data Export\n\n";
+    features.features.forEach((f, i) => {
+      const name = f.properties?.name || `Feature ${i + 1}`;
+      md += `## ${name}\n`;
+      md += `- **Type**: ${f.geometry.type}\n`;
+      if (f.properties?.description) md += `- **Description**: ${f.properties.description}\n`;
+      if (f.geometry.type === 'Polygon') {
+         md += `- **Area**: ${turf.area(f).toFixed(2)} sq meters\n`;
+      }
+      if (f.geometry.type === 'LineString') {
+         md += `- **Length**: ${turf.length(f, {units: 'kilometers'}).toFixed(2)} km\n`;
+      }
+      md += "\n";
+    });
+    const dataStr = "data:text/markdown;charset=utf-8," + encodeURIComponent(md);
+    const a = document.createElement('a');
+    a.href = dataStr;
+    a.download = "simplegis_export.md";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const exportToImage = () => {
@@ -272,8 +331,6 @@ function App() {
     setChatInput('');
 
     // Simulated NLP heuristics
-    const text = userMsg.toLowerCase();
-    
     try {
       const res = await fetch('http://localhost:3001/api/llm/query', {
         method: 'POST',
@@ -295,6 +352,68 @@ function App() {
       console.error(err);
       setMessages(prev => [...prev, { sender: 'ai', text: "Error communicating with the backend API. Make sure Ollama is running!" }]);
     }
+  };
+
+  const handleSaveProperties = async (e) => {
+    e.preventDefault();
+    if (!editingFeature) return;
+
+    try {
+      await fetch(`http://localhost:3001/api/features/${editingFeature.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          geometry: editingFeature.geometry,
+          properties: editingFeature.properties
+        })
+      });
+      setEditingFeature(null);
+      fetchFeatures();
+    } catch (err) {
+      console.error("Error saving properties", err);
+    }
+  };
+
+  const toggleFeatureVisibility = (id) => {
+    setHiddenFeatureIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const flyToFeature = (feature) => {
+    try {
+      if (feature.geometry.type === 'Point') {
+        setJumpTo({ center: [feature.geometry.coordinates[1], feature.geometry.coordinates[0]] });
+      } else {
+        const bbox = turf.bbox(feature);
+        const bounds = [
+          [bbox[1], bbox[0]], // [minLat, minLng]
+          [bbox[3], bbox[2]]  // [maxLat, maxLng]
+        ];
+        setJumpTo({ bounds });
+      }
+    } catch (e) {
+      console.error("FlyTo error", e);
+    }
+  };
+
+  const deleteFeature = async (id) => {
+    if (confirm("Are you sure you want to delete this feature?")) {
+      try {
+        await fetch(`http://localhost:3001/api/features/${id}`, { method: 'DELETE' });
+        fetchFeatures();
+      } catch (e) {
+        console.error("Delete error", e);
+      }
+    }
+  };
+
+  const visibleFeatures = {
+    type: 'FeatureCollection',
+    features: features.features.filter(f => !hiddenFeatureIds.has(f.id))
   };
 
   return (
@@ -328,6 +447,118 @@ function App() {
           </div>
         </header>
       </Draggable>
+
+      {/* Layer Management Sidebar */}
+      <div className={`absolute top-20 left-4 bottom-4 z-[999] w-64 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
+        <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
+          <h2 className="text-white text-sm font-semibold flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            Layers
+          </h2>
+          <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">{features.features.length}</span>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+          {features.features.length === 0 ? (
+            <div className="text-white/40 text-xs text-center mt-6">No layers drawn yet</div>
+          ) : (
+            features.features.map(f => {
+              const isHidden = hiddenFeatureIds.has(f.id);
+              const name = f.properties?.name || `Feature ${f.id}`;
+              const typeColor = f.geometry.type === 'Point' ? 'bg-orange-500' : f.geometry.type === 'LineString' ? 'bg-blue-500' : 'bg-emerald-500';
+              
+              return (
+                <div key={f.id} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg group transition">
+                  <div className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1" onClick={() => flyToFeature(f)}>
+                    <div className={`w-2 h-2 rounded-full ${typeColor} flex-shrink-0 ${isHidden ? 'opacity-30' : ''}`}></div>
+                    <div className="truncate">
+                      <p className={`text-xs font-medium truncate ${isHidden ? 'text-white/40 line-through' : 'text-white/90'}`}>{name}</p>
+                      <p className="text-[10px] text-white/40">{f.geometry.type}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-md">
+                      {isHidden ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                      )}
+                    </button>
+                    <button onClick={() => deleteFeature(f.id)} className="p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 rounded-md">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path></svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Sidebar Toggle Button */}
+      <button 
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="absolute top-20 left-0 z-[1000] bg-slate-900/80 backdrop-blur-xl border border-white/10 p-2 rounded-r-lg shadow-2xl text-white/70 hover:text-white transition"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          {isSidebarOpen ? <path d="M15 18l-6-6 6-6"/> : <path d="M9 18l6-6-6-6"/>}
+        </svg>
+      </button>
+
+      {/* Feature Properties Editor Modal */}
+      {editingFeature && (
+        <div className="absolute inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
+            <div className="px-5 py-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+              <h2 className="text-white font-semibold">Edit Feature Properties</h2>
+              <button onClick={() => setEditingFeature(null)} className="text-white/50 hover:text-white"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+            </div>
+            <form onSubmit={handleSaveProperties} className="p-5 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Name</label>
+                <input 
+                  type="text" 
+                  value={editingFeature.properties?.name || ''} 
+                  onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, name: e.target.value}}))}
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none transition"
+                  placeholder="E.g., Central Park"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Description</label>
+                <textarea 
+                  value={editingFeature.properties?.description || ''} 
+                  onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, description: e.target.value}}))}
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none transition min-h-[80px]"
+                  placeholder="Enter details about this location..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Color</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="color" 
+                    value={editingFeature.properties?.color || '#3b82f6'} 
+                    onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, color: e.target.value}}))}
+                    className="h-9 w-14 bg-black/30 border border-white/10 rounded-lg cursor-pointer"
+                  />
+                  <input 
+                    type="text" 
+                    value={editingFeature.properties?.color || '#3b82f6'} 
+                    onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, color: e.target.value}}))}
+                    className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none transition uppercase font-mono"
+                  />
+                </div>
+              </div>
+              <div className="mt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setEditingFeature(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 transition">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition shadow-lg shadow-blue-500/20">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Floating Chat UI */}
       <div className="absolute bottom-6 right-6 z-[1001] flex flex-col items-end pointer-events-none">
