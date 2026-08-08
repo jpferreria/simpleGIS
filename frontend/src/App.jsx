@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, GeoJSON, FeatureGroup } from 'react-leaflet';
-import { EditControl } from 'react-leaflet-draw';
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap } from 'react-leaflet';
 import html2canvas from 'html2canvas';
 
 // Fix for default Leaflet icons in Vite/React
@@ -8,7 +7,10 @@ import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet-draw/dist/leaflet.draw.css';
+
+// Geoman for drawing
+import '@geoman-io/leaflet-geoman-free';
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 let DefaultIcon = L.icon({
     iconUrl: icon,
@@ -16,6 +18,33 @@ let DefaultIcon = L.icon({
     iconAnchor: [12, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
+
+function GeomanSetup({ onCreated }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.pm.addControls({
+      position: 'topleft',
+      drawCircleMarker: false,
+      drawCircle: false,
+      drawText: false,
+      editControls: false,
+    });
+
+    const handleCreate = (e) => {
+      onCreated({ layerType: e.shape, layer: e.layer });
+    };
+
+    map.on('pm:create', handleCreate);
+
+    return () => {
+      map.pm.removeControls();
+      map.off('pm:create', handleCreate);
+    };
+  }, [map, onCreated]);
+
+  return null;
+}
 
 function App() {
   const position = [51.505, -0.09]; // Default to London
@@ -39,7 +68,14 @@ function App() {
 
   const onCreated = async (e) => {
     const { layerType, layer } = e;
-    const geojson = layer.toGeoJSON();
+    
+    let geojson;
+    if (typeof layer.toGeoJSON === 'function') {
+      geojson = layer.toGeoJSON();
+    } else {
+      console.error("Layer cannot be converted to GeoJSON");
+      return;
+    }
     
     // Save to backend
     try {
@@ -53,6 +89,8 @@ function App() {
         })
       });
       if (response.ok) {
+        // Remove the drawn layer immediately since we fetch from DB as a GeoJSON layer
+        layer.remove();
         fetchFeatures(); // Reload features from DB
       }
     } catch (err) {
@@ -112,20 +150,7 @@ function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          <FeatureGroup>
-            <EditControl
-              position='topright'
-              onCreated={onCreated}
-              draw={{
-                rectangle: true,
-                polyline: true,
-                polygon: true,
-                circle: false,
-                circlemarker: false,
-                marker: true,
-              }}
-            />
-          </FeatureGroup>
+          <GeomanSetup onCreated={onCreated} />
 
           {features && features.features && features.features.length > 0 && (
             <GeoJSON data={features} key={JSON.stringify(features)} />
