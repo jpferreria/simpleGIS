@@ -38,49 +38,22 @@ function GeomanSetup({ onCreated }) {
 
     map.on('pm:create', handleCreate);
 
-    // Make the Geoman toolbar draggable
+    // Make the Geoman toolbar draggable using Leaflet's native Draggable class
     setTimeout(() => {
       const toolbars = document.querySelectorAll('.leaflet-pm-toolbar');
       toolbars.forEach(toolbar => {
-        toolbar.style.position = 'absolute';
         toolbar.style.cursor = 'move';
         
-        let isDragging = false;
-        let startX, startY, initialLeft, initialTop;
+        // Prevent click events on buttons from initiating drag
+        const buttons = toolbar.querySelectorAll('a');
+        buttons.forEach(btn => {
+          btn.addEventListener('mousedown', (e) => e.stopPropagation());
+          btn.addEventListener('touchstart', (e) => e.stopPropagation());
+        });
 
-        const onMouseDown = (e) => {
-          if (e.target.tagName.toLowerCase() === 'a' || e.target.closest('a')) return;
-          
-          isDragging = true;
-          startX = e.clientX;
-          startY = e.clientY;
-          
-          initialLeft = toolbar.offsetLeft;
-          initialTop = toolbar.offsetTop;
-          
-          // Disable transitions during drag for smoothness
-          toolbar.style.transition = 'none';
-          
-          document.addEventListener('mousemove', onMouseMove);
-          document.addEventListener('mouseup', onMouseUp);
-        };
-
-        const onMouseMove = (e) => {
-          if (!isDragging) return;
-          const dx = e.clientX - startX;
-          const dy = e.clientY - startY;
-          toolbar.style.left = `${initialLeft + dx}px`;
-          toolbar.style.top = `${initialTop + dy}px`;
-          toolbar.style.margin = '0'; // Clear Leaflet's default margins
-        };
-
-        const onMouseUp = () => {
-          isDragging = false;
-          document.removeEventListener('mousemove', onMouseMove);
-          document.removeEventListener('mouseup', onMouseUp);
-        };
-
-        toolbar.addEventListener('mousedown', onMouseDown);
+        // Initialize Leaflet's built-in Draggable class
+        const draggable = new L.Draggable(toolbar);
+        draggable.enable();
       });
     }, 500);
 
