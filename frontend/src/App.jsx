@@ -7,12 +7,14 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import Draggable from 'react-draggable';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+
 import 'leaflet/dist/leaflet.css';
 
 // Geoman for drawing
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
-import Draggable from 'react-draggable';
 import * as toGeoJSON from '@tmcw/togeojson';
 
 let DefaultIcon = L.icon({
@@ -153,6 +155,9 @@ function App() {
   // M13 State (Hexbin Density)
   const [showDensityMap, setShowDensityMap] = useState(false);
   const [hexGridData, setHexGridData] = useState(null);
+
+  // M14 State (Analytics Dashboard)
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -659,6 +664,40 @@ function App() {
     features: features.features.filter(f => !hiddenFeatureIds.has(f.id))
   };
 
+  const calculateMetrics = () => {
+    let pointCount = 0;
+    let lineCount = 0;
+    let polyCount = 0;
+    let totalLengthKm = 0;
+    let totalAreaSqKm = 0;
+
+    visibleFeatures.features.forEach(f => {
+      const type = f.geometry.type;
+      if (type === 'Point') pointCount++;
+      else if (type === 'LineString') {
+        lineCount++;
+        totalLengthKm += turf.length(f, {units: 'kilometers'});
+      }
+      else if (type === 'Polygon' || type === 'MultiPolygon') {
+        polyCount++;
+        totalAreaSqKm += turf.area(f) / 1000000;
+      }
+    });
+
+    return {
+      pointCount, lineCount, polyCount,
+      totalLengthKm: totalLengthKm.toFixed(2),
+      totalAreaSqKm: totalAreaSqKm.toFixed(2),
+      chartData: [
+        { name: 'Points', value: pointCount, color: '#f97316' },
+        { name: 'Lines', value: lineCount, color: '#3b82f6' },
+        { name: 'Polygons', value: polyCount, color: '#10b981' }
+      ].filter(d => d.value > 0)
+    };
+  };
+
+  const metrics = showDashboard ? calculateMetrics() : null;
+
   return (
     <div 
       className="h-screen w-screen flex flex-col bg-slate-900 font-sans overflow-hidden relative"
@@ -724,6 +763,10 @@ function App() {
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                 Density
               </button>
+              <button onClick={() => setShowDashboard(!showDashboard)} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition border-l border-white/10 flex items-center gap-1 ${showDashboard ? 'text-purple-400 bg-purple-500/10' : 'text-white/80'}`}>
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Metrics
+              </button>
             </div>
               <button onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
             </div>
@@ -766,27 +809,95 @@ function App() {
                     <div className={`w-2 h-2 rounded-full ${typeColor} flex-shrink-0 ${isHidden ? 'opacity-30' : ''}`}></div>
                     <div className="truncate">
                       <p className={`text-xs font-medium truncate ${isHidden ? 'text-white/40 line-through' : 'text-white/90'}`}>{name}</p>
-                      <p className="text-[10px] text-white/40">{f.geometry.type}</p>
+                      <p className="text-[10px] text-white/40 truncate">{f.geometry.type}</p>
                     </div>
                   </div>
-                  
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-md">
-                      {isHidden ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg>
-                      ) : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                      )}
+                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1 text-white/50 hover:text-white transition">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        {isHidden ? <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path> : <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>}
+                        {!isHidden && <circle cx="12" cy="12" r="3"></circle>}
+                      </svg>
                     </button>
-                    <button onClick={() => deleteFeature(f.id)} className="p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 rounded-md">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path></svg>
-                    </button>
+                    <button onClick={() => deleteFeature(f.id)} className="p-1 text-white/50 hover:text-red-400 transition"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                   </div>
                 </div>
               );
             })
           )}
         </div>
+      </div>
+
+      {/* Analytics Dashboard Sidebar */}
+      <div className={`absolute top-20 right-4 bottom-4 z-[999] w-80 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${showDashboard ? 'translate-x-0' : 'translate-x-[110%]'}`}>
+        <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
+          <h2 className="text-white text-sm font-semibold flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"></path></svg>
+            Data Analytics
+          </h2>
+          <button onClick={() => setShowDashboard(false)} className="text-white/50 hover:text-white transition">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        
+        {metrics && (
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-6">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Total Features</p>
+                <p className="text-2xl font-light text-white">{visibleFeatures.features.length}</p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Polygons</p>
+                <p className="text-xl font-light text-emerald-400">{metrics.polyCount}</p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-2">
+              <div className="flex justify-between items-end">
+                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider">Total Area</p>
+                <p className="text-lg font-medium text-emerald-400">{metrics.totalAreaSqKm} <span className="text-xs text-white/50">sq km</span></p>
+              </div>
+              <div className="flex justify-between items-end border-t border-white/5 pt-2">
+                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider">Total Length</p>
+                <p className="text-lg font-medium text-blue-400">{metrics.totalLengthKm} <span className="text-xs text-white/50">km</span></p>
+              </div>
+            </div>
+
+            <div className="flex-1 min-h-[200px] flex flex-col">
+              <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-2">Feature Distribution</p>
+              {metrics.chartData.length > 0 ? (
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={metrics.chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {metrics.chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                        itemStyle={{ color: '#fff', fontSize: '12px' }}
+                      />
+                      <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-white/20 text-xs">No data to chart</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sidebar Toggle Button */}
