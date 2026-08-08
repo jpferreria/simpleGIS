@@ -620,10 +620,10 @@ function App() {
           
           <GeomanSetup onCreated={onCreated} />
 
-          {features && features.features && features.features.length > 0 && (
+          {visibleFeatures && visibleFeatures.features && visibleFeatures.features.length > 0 && (
             <GeoJSON 
-              data={features} 
-              key={JSON.stringify(features)} 
+              data={visibleFeatures} 
+              key={JSON.stringify(visibleFeatures)} 
               onEachFeature={onEachFeature}
             />
           )}
