@@ -17,6 +17,27 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import * as toGeoJSON from '@tmcw/togeojson';
 
+// --- M17 Custom Point Icons ---
+const ICON_SVGS = {
+  pin: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+  star: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
+  hospital: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>`,
+  alert: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+  target: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>`
+};
+
+const geoJsonPointToLayer = (feature, latlng) => {
+  const iconName = feature.properties?.icon || 'pin';
+  const iconHtml = `<div style="color: ${feature.properties?.color || '#3b82f6'};">${ICON_SVGS[iconName] || ICON_SVGS.pin}</div>`;
+  const markerIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: iconHtml,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+  return L.marker(latlng, { icon: markerIcon });
+};
+
 let DefaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow,
@@ -234,7 +255,11 @@ function App() {
         body: JSON.stringify({
           type: 'Feature',
           geometry: geojson.geometry,
-          properties: { layerType, name: `New ${layerType}` }
+          properties: { 
+            layerType, 
+            name: `New ${layerType}`,
+            icon: layerType === 'Point' ? 'pin' : undefined
+          }
         })
       });
       if (response.ok) {
@@ -426,6 +451,19 @@ function App() {
     });
   };
 
+  const handleSaveFeature = async (f) => {
+    await fetch('http://localhost:3001/api/features', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: f.properties
+      })
+    });
+    fetchFeatures();
+  };
+
   const processImportFile = async (file) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -443,30 +481,22 @@ function App() {
           return;
         }
 
-        // Validate structure
-        const importFeatures = geojsonResult.type === 'FeatureCollection' 
-          ? geojsonResult.features 
-          : (geojsonResult.type === 'Feature' ? [geojsonResult] : null);
-
-        if (!importFeatures) {
-          throw new Error("Invalid GeoJSON structure");
-        }
-
-        // Save each feature to database
-        for (const f of importFeatures) {
-          await fetch('http://localhost:3001/api/features', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'Feature',
-              geometry: f.geometry,
-              properties: f.properties || { name: `Imported ${f.geometry.type}` }
-            })
+        if (geojsonResult.features) {
+          geojsonResult.features.forEach(f => {
+            if (!f.properties) f.properties = {};
+            f.properties.id = crypto.randomUUID();
+            // Give new points a default icon if not present
+            if (f.geometry.type === 'Point' && !f.properties.icon) f.properties.icon = 'pin';
+            handleSaveFeature(f);
           });
+        } else {
+          if (!geojsonResult.properties) geojsonResult.properties = {};
+          geojsonResult.properties.id = crypto.randomUUID();
+          if (geojsonResult.geometry.type === 'Point' && !geojsonResult.properties.icon) geojsonResult.properties.icon = 'pin';
+          handleSaveFeature(geojsonResult);
         }
         
-        fetchFeatures(); // refresh map
-        alert(`Successfully imported ${importFeatures.length} features!`);
+        alert(`Successfully imported features!`);
 
       } catch (err) {
         console.error("Import failed:", err);
@@ -1033,6 +1063,28 @@ function App() {
                   placeholder="Enter details about this location..."
                 />
               </div>
+              {/* M17 Icon Picker for Points */}
+              {editingFeature.geometry.type === 'Point' && (
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Point Icon</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.keys(ICON_SVGS).map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setEditingFeature(prev => ({...prev, properties: {...prev.properties, icon: key}}))}
+                        className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
+                          (editingFeature.properties.icon || 'pin') === key
+                            ? 'border-blue-500 bg-blue-500/20 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                            : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
+                        }`}
+                        title={key.charAt(0).toUpperCase() + key.slice(1)}
+                        dangerouslySetInnerHTML={{ __html: ICON_SVGS[key] }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-white/60 mb-1">Color</label>
                 <div className="flex gap-2">
@@ -1177,6 +1229,7 @@ function App() {
               data={visibleFeatures} 
               key={JSON.stringify(visibleFeatures)} 
               onEachFeature={onEachFeature}
+              pointToLayer={geoJsonPointToLayer}
             />
           )}
 
