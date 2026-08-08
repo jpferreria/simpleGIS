@@ -709,7 +709,13 @@ function App() {
       const line = turf.lineString(coords);
       const totalLength = turf.length(line, { units: 'kilometers' });
       
-      const numSegments = Math.min(coords.length - 1, 99); 
+      if (totalLength === 0) {
+        alert("Line has no length.");
+        setIsFetchingElevation(false);
+        return;
+      }
+      
+      const numSegments = Math.max(1, Math.min(coords.length - 1, 99)); 
       const segmentLength = totalLength / numSegments;
       
       const sampledCoords = [];
@@ -721,7 +727,13 @@ function App() {
       // OpenTopoData expects lat,lon format
       const locationsString = sampledCoords.map(c => `${c[1]},${c[0]}`).join('|');
       
-      const response = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${locationsString}`);
+      const response = await fetch('https://api.opentopodata.org/v1/srtm90m', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ locations: locationsString })
+      });
       const data = await response.json();
 
       if (data.status === 'OK') {
