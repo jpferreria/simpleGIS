@@ -42,6 +42,22 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'LiteGIS Backend is running', user: req.user || null });
 });
 
+app.post('/api/elevation', async (req, res) => {
+  try {
+    const { locations } = req.body;
+    const response = await fetch('https://api.opentopodata.org/v1/srtm90m', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locations })
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Elevation proxy error:', error);
+    res.status(500).json({ error: 'Failed to fetch elevation data' });
+  }
+});
+
 // Start the server only if not in test mode
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {

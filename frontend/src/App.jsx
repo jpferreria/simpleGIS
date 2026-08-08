@@ -727,7 +727,7 @@ function App() {
       // OpenTopoData expects lat,lon format
       const locationsString = sampledCoords.map(c => `${c[1]},${c[0]}`).join('|');
       
-      const response = await fetch('https://api.opentopodata.org/v1/srtm90m', {
+      const response = await fetch('http://localhost:3001/api/elevation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
