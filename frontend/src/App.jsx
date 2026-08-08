@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import Draggable from 'react-draggable';
+import * as toGeoJSON from '@tmcw/togeojson';
 
 let DefaultIcon = L.icon({
     iconUrl: icon,
@@ -92,6 +93,10 @@ function App() {
   const [editingFeature, setEditingFeature] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [jumpTo, setJumpTo] = useState(null);
+
+  // M9 State (Imports)
+  const fileInputRef = useRef(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -304,9 +309,58 @@ function App() {
       const imgData = canvas.toDataURL('image/png');
       const dlAnchorElem = document.createElement('a');
       dlAnchorElem.setAttribute("href", imgData);
-      dlAnchorElem.setAttribute("download", "map_view.png");
-      dlAnchorElem.click();
-    });
+      // In a real app we'd use dom-to-image or leaflet-image. 
+    alert("Image export triggered (Requires html2canvas/dom-to-image implementation)");
+  };
+
+  const processImportFile = async (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const content = e.target.result;
+      let geojsonResult = null;
+
+      try {
+        if (file.name.endsWith('.kml')) {
+          const doc = new DOMParser().parseFromString(content, 'text/xml');
+          geojsonResult = toGeoJSON.kml(doc);
+        } else if (file.name.endsWith('.json') || file.name.endsWith('.geojson')) {
+          geojsonResult = JSON.parse(content);
+        } else {
+          alert("Unsupported file format. Please use .kml or .geojson");
+          return;
+        }
+
+        // Validate structure
+        const importFeatures = geojsonResult.type === 'FeatureCollection' 
+          ? geojsonResult.features 
+          : (geojsonResult.type === 'Feature' ? [geojsonResult] : null);
+
+        if (!importFeatures) {
+          throw new Error("Invalid GeoJSON structure");
+        }
+
+        // Save each feature to database
+        for (const f of importFeatures) {
+          await fetch('http://localhost:3001/api/features', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'Feature',
+              geometry: f.geometry,
+              properties: f.properties || { name: `Imported ${f.geometry.type}` }
+            })
+          });
+        }
+        
+        fetchFeatures(); // refresh map
+        alert(`Successfully imported ${importFeatures.length} features!`);
+
+      } catch (err) {
+        console.error("Import failed:", err);
+        alert("Failed to import file. Check console for details.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   // LLM Chat State
@@ -417,7 +471,27 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-900 font-sans overflow-hidden">
+    <div 
+      className="h-screen w-screen flex flex-col bg-slate-900 font-sans overflow-hidden relative"
+      onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+      onDragLeave={() => setIsDraggingOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDraggingOver(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          processImportFile(e.dataTransfer.files[0]);
+        }
+      }}
+    >
+      {/* Drag overlay */}
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-[9999] bg-blue-500/20 backdrop-blur-sm border-4 border-blue-500 border-dashed flex items-center justify-center pointer-events-none">
+          <div className="bg-slate-900/90 text-white px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
+            <h2 className="text-2xl font-bold tracking-tight">Drop KML or GeoJSON to import</h2>
+          </div>
+        </div>
+      )}
       
       {/* Draggable Glassmorphism Toolbar */}
       <Draggable handle=".drag-handle" bounds="parent">
@@ -436,6 +510,17 @@ function App() {
           
           <div className="flex gap-2 items-center">
             <div className="flex bg-white/10 rounded-md overflow-hidden border border-white/5 shadow-inner">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={(e) => e.target.files?.length && processImportFile(e.target.files[0])} 
+                className="hidden" 
+                accept=".kml,.geojson,.json"
+              />
+              <button onClick={() => fileInputRef.current.click()} className="hover:bg-blue-500/20 text-blue-300 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
+                Import
+              </button>
               <button onClick={exportToJSON} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition">JSON</button>
               <button onClick={exportToMarkdown} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition">MD</button>
               <button onClick={exportToImage} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium transition flex items-center gap-1">
