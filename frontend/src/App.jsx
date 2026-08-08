@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap } from 'react-leaflet';
 import html2canvas from 'html2canvas';
+import * as turf from '@turf/turf';
 
 // Fix for default Leaflet icons in Vite/React
 import L from 'leaflet';
@@ -66,6 +67,38 @@ function App() {
     fetchFeatures();
   }, []);
 
+  // Set up global function for the popup buttons
+  useEffect(() => {
+    window.generateBuffer = async (featureStr) => {
+      try {
+        const feature = JSON.parse(decodeURIComponent(featureStr));
+        // Generate a 1km buffer around the feature
+        const buffered = turf.buffer(feature, 1, { units: 'kilometers' });
+        
+        // Save the buffer to backend
+        const response = await fetch('http://localhost:3001/api/features', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'Feature',
+            geometry: buffered.geometry,
+            properties: { layerType: 'Polygon', isBuffer: true, parentId: feature.id }
+          })
+        });
+        
+        if (response.ok) {
+          fetchFeatures();
+        }
+      } catch (err) {
+        console.error("Error generating buffer:", err);
+      }
+    };
+    
+    return () => {
+      delete window.generateBuffer;
+    };
+  }, [features]);
+
   const onCreated = async (e) => {
     const { layerType, layer } = e;
     
@@ -89,12 +122,50 @@ function App() {
         })
       });
       if (response.ok) {
-        // Remove the drawn layer immediately since we fetch from DB as a GeoJSON layer
         layer.remove();
-        fetchFeatures(); // Reload features from DB
+        fetchFeatures(); 
       }
     } catch (err) {
       console.error("Failed to save feature", err);
+    }
+  };
+
+  const onEachFeature = (feature, layer) => {
+    let popupContent = `<b>Feature Type:</b> ${feature.geometry.type}<br/>`;
+
+    if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+      const area = turf.area(feature); // Area in square meters
+      const areaDisplay = area > 10000 
+        ? `${(area / 1000000).toFixed(2)} sq km` 
+        : `${area.toFixed(2)} sq m`;
+      popupContent += `<b>Area:</b> ${areaDisplay}<br/>`;
+    } else if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
+      const length = turf.length(feature, { units: 'kilometers' });
+      const lengthDisplay = length < 1 
+        ? `${(length * 1000).toFixed(2)} meters` 
+        : `${length.toFixed(2)} km`;
+      popupContent += `<b>Distance:</b> ${lengthDisplay}<br/>`;
+    }
+    
+    if (feature.properties && feature.properties.isBuffer) {
+      popupContent += `<span style="color: #10b981; font-weight: bold;">(Buffer Zone)</span><br/>`;
+    }
+
+    const featureStr = encodeURIComponent(JSON.stringify(feature));
+    const buttonHtml = `<button onclick="window.generateBuffer('${featureStr}')" style="margin-top: 8px; padding: 6px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-family: Inter, sans-serif; font-size: 12px; width: 100%; font-weight: 500;">Generate 1km Buffer</button>`;
+    
+    popupContent += buttonHtml;
+
+    layer.bindPopup(popupContent);
+    
+    // Optional: style buffer zones differently
+    if (feature.properties && feature.properties.isBuffer && layer.setStyle) {
+      layer.setStyle({
+        color: '#10b981',
+        fillColor: '#10b981',
+        fillOpacity: 0.2,
+        dashArray: '5, 5'
+      });
     }
   };
 
@@ -161,7 +232,11 @@ function App() {
           <GeomanSetup onCreated={onCreated} />
 
           {features && features.features && features.features.length > 0 && (
-            <GeoJSON data={features} key={JSON.stringify(features)} />
+            <GeoJSON 
+              data={features} 
+              key={JSON.stringify(features)} 
+              onEachFeature={onEachFeature}
+            />
           )}
 
         </MapContainer>
