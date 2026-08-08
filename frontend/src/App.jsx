@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON } from 'react-leaflet';
 
 // Fix for default Leaflet icons in Vite/React
 import L from 'leaflet';
@@ -15,6 +15,19 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 function App() {
   const position = [51.505, -0.09]; // Default to London
+  const [features, setFeatures] = useState(null);
+
+  useEffect(() => {
+    // Fetch features from our backend API
+    fetch('http://localhost:3001/api/features')
+      .then(res => res.json())
+      .then(data => {
+        if (data.type === 'FeatureCollection') {
+          setFeatures(data);
+        }
+      })
+      .catch(err => console.error("Error fetching map features:", err));
+  }, []);
 
   return (
     <div className="h-screen w-screen flex flex-col">
@@ -28,6 +41,7 @@ function App() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          {features && <GeoJSON data={features} />}
           <Marker position={position}>
             <Popup>
               A sample point on the map.

@@ -20,6 +20,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Routes
+const featureRoutes = require('./routes/features');
+const llmRoutes = require('./routes/llm');
+
 // Auth Routes
 app.get('/auth/github',
   passport.authenticate('github', { scope: [ 'user:email' ] }));
@@ -30,6 +33,10 @@ app.get('/auth/github/callback',
     // Successful authentication, redirect home.
     res.redirect('http://localhost:5173/'); // Redirect to frontend
   });
+
+// API Routes
+app.use('/api/features', featureRoutes);
+app.use('/api/llm', llmRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'SimpleGIS Backend is running', user: req.user || null });
