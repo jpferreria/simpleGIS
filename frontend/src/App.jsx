@@ -684,7 +684,7 @@ function App() {
       </Draggable>
 
       {/* Layer Management Sidebar */}
-      <div className={`absolute top-20 left-4 bottom-4 z-[999] w-64 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
+      <div className={`absolute top-4 left-4 bottom-4 z-[999] w-64 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
         <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
           <h2 className="text-white text-sm font-semibold flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
@@ -734,7 +734,7 @@ function App() {
       {/* Sidebar Toggle Button */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="absolute top-20 left-0 z-[1000] bg-slate-900/80 backdrop-blur-xl border border-white/10 p-2 rounded-r-lg shadow-2xl text-white/70 hover:text-white transition"
+        className="absolute top-4 left-0 z-[1000] bg-slate-900/80 backdrop-blur-xl border border-white/10 p-2 rounded-r-lg shadow-2xl text-white/70 hover:text-white transition"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           {isSidebarOpen ? <path d="M15 18l-6-6 6-6"/> : <path d="M9 18l6-6-6-6"/>}
