@@ -8,7 +8,7 @@ import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import Draggable from 'react-draggable';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 
 import 'leaflet/dist/leaflet.css';
 
@@ -188,6 +188,10 @@ function App() {
 
   // M18 State (Spatial Boolean Ops)
   const [selectedFeatureIds, setSelectedFeatureIds] = useState([]);
+
+  // M19 State (Elevation Profiling)
+  const [elevationData, setElevationData] = useState(null);
+  const [isFetchingElevation, setIsFetchingElevation] = useState(false);
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -684,6 +688,60 @@ function App() {
     }
   };
 
+  // --- M19 Elevation Profiling ---
+  const generateElevationProfile = async (feature) => {
+    try {
+      setIsFetchingElevation(true);
+      setElevationData(null);
+      
+      let coords = [];
+      if (feature.geometry.type === 'LineString') {
+        coords = feature.geometry.coordinates;
+      } else if (feature.geometry.type === 'MultiLineString') {
+        coords = feature.geometry.coordinates.flat();
+      } else {
+        alert("Elevation profiling is only supported for lines.");
+        setIsFetchingElevation(false);
+        return;
+      }
+
+      // We need to sample the line to max 100 points to respect OpenTopoData limits
+      const line = turf.lineString(coords);
+      const totalLength = turf.length(line, { units: 'kilometers' });
+      
+      const numSegments = Math.min(coords.length - 1, 99); 
+      const segmentLength = totalLength / numSegments;
+      
+      const sampledCoords = [];
+      for (let i = 0; i <= numSegments; i++) {
+        const point = turf.along(line, i * segmentLength, { units: 'kilometers' });
+        sampledCoords.push(point.geometry.coordinates);
+      }
+
+      // OpenTopoData expects lat,lon format
+      const locationsString = sampledCoords.map(c => `${c[1]},${c[0]}`).join('|');
+      
+      const response = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${locationsString}`);
+      const data = await response.json();
+
+      if (data.status === 'OK') {
+        // Map to recharts format
+        const profile = data.results.map((res, idx) => ({
+          distance: (idx * segmentLength).toFixed(2), // km
+          elevation: res.elevation, // meters
+        }));
+        setElevationData({ featureName: feature.properties.name || 'Unnamed Line', profile });
+      } else {
+        alert("Failed to fetch elevation data.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error generating elevation profile.");
+    } finally {
+      setIsFetchingElevation(false);
+    }
+  };
+
   // --- M15 Spatial Buffering ---
   const generateBuffer = async (feature) => {
     try {
@@ -972,8 +1030,6 @@ function App() {
           ) : (
             features.features.map(f => {
               const isHidden = hiddenFeatureIds.has(f.id);
-              const name = f.properties?.name || `Feature ${f.id}`;
-              const typeColor = f.geometry.type === 'Point' ? 'bg-orange-500' : f.geometry.type === 'LineString' ? 'bg-blue-500' : 'bg-emerald-500';
               
               return (
                 <div key={f.id} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg group transition">
@@ -984,6 +1040,17 @@ function App() {
                     <div className="flex-1 overflow-hidden">
                       <div className="text-sm font-medium truncate">{f.properties?.name || 'Unnamed Feature'}</div>
                       <div className="text-[10px] text-white/40">{f.geometry.type}</div>
+                      
+                      {(f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString') && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); generateElevationProfile(f); }}
+                          disabled={isFetchingElevation}
+                          className="w-full mt-2 flex items-center justify-center gap-2 p-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg transition disabled:opacity-50"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h20M5 20l4-8 5 4 8-12"/></svg>
+                          <div className="text-[10px]">{isFetchingElevation ? '...' : 'Profile'}</div>
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1316,6 +1383,44 @@ function App() {
           >
             Union
           </button>
+        </div>
+      )}
+
+      {/* Elevation Profile Panel */}
+      {elevationData && (
+        <div className="absolute bottom-8 right-8 z-[1000] w-[500px] h-[300px] bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
+            <div className="flex items-center gap-2">
+              <svg width="18" height="18" className="text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h20M5 20l4-8 5 4 8-12"/></svg>
+              <h3 className="text-white font-semibold text-sm">Elevation: {elevationData.featureName}</h3>
+            </div>
+            <button onClick={() => setElevationData(null)} className="text-white/50 hover:text-white/90">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <div className="flex-1 p-4 w-full h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={elevationData.profile} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorElevation" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                <XAxis dataKey="distance" stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={(val) => `${val}km`} />
+                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={(val) => `${val}m`} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                  itemStyle={{ color: '#818cf8' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.6)' }}
+                  formatter={(value) => [`${value}m`, 'Elevation']}
+                  labelFormatter={(label) => `Distance: ${label}km`}
+                />
+                <Area type="monotone" dataKey="elevation" stroke="#818cf8" strokeWidth={2} fillOpacity={1} fill="url(#colorElevation)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 

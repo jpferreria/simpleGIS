@@ -16,6 +16,7 @@ A modern, full-stack Geographic Information System (GIS) built with React, Leafl
   - **Analytics Dashboard:** Real-time calculation of enclosed areas (sq km) and path lengths (km). Includes a donut chart visualization of feature types.
   - **Hexbin Density Mapping:** Generate a hex-grid heatmap to visualize the density of your plotted points.
   - **Spatial Buffering:** Automatically generate a 500-meter buffer polygon around any point, line, or polygon with the click of a button.
+  - **Elevation Profiling:** Generate 3D terrain cross-sections along drawn lines using the OpenTopoData API. *(Note: Due to public API limits, elevation profiles are capped at 100 sample points per line).*
 - **Custom Point Icons:** Swap the default blue pin for highly recognizable symbols (e.g., Star, Hospital, Alert, Target) that inherit your custom colors.
 - **Data Export & Import:** 
   - Import GeoJSON and KML files via Drag-and-Drop or the Import menu.
