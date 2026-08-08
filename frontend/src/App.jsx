@@ -150,6 +150,10 @@ function App() {
   // M12 State (Basemaps)
   const [activeBasemap, setActiveBasemap] = useState('osm');
 
+  // M13 State (Hexbin Density)
+  const [showDensityMap, setShowDensityMap] = useState(false);
+  const [hexGridData, setHexGridData] = useState(null);
+
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
       .then(res => res.json())
@@ -557,6 +561,56 @@ function App() {
       .then(() => fetchFeatures());
   };
 
+  // --- M13 Hexbin Density Mapping ---
+  useEffect(() => {
+    if (!showDensityMap || !features.features.length) {
+      setHexGridData(null);
+      return;
+    }
+    
+    // Get visible Point features
+    const pointFeatures = features.features.filter(f => f.geometry.type === 'Point' && !hiddenFeatureIds.has(f.id));
+    if (pointFeatures.length === 0) {
+      setHexGridData(null);
+      return;
+    }
+
+    try {
+      const pointsCollection = turf.featureCollection(pointFeatures);
+      const bbox = turf.bbox(pointsCollection);
+      
+      // Calculate dynamic cell size based on bounding box (approx 20 hexes wide)
+      const widthKm = turf.distance([bbox[0], bbox[1]], [bbox[2], bbox[1]]);
+      const cellSide = Math.max(widthKm / 20, 0.5); // min 500m
+
+      const hexGrid = turf.hexGrid(bbox, cellSide, { units: 'kilometers' });
+
+      let maxCount = 0;
+      const countedHexes = hexGrid.features.map(hex => {
+        const ptsWithin = turf.pointsWithinPolygon(pointsCollection, hex);
+        const count = ptsWithin.features.length;
+        if (count > maxCount) maxCount = count;
+        hex.properties.count = count;
+        return hex;
+      }).filter(hex => hex.properties.count > 0);
+
+      countedHexes.forEach(hex => {
+        const ratio = hex.properties.count / maxCount;
+        let color = '#fef08a'; // yellow
+        if (ratio > 0.33) color = '#f97316'; // orange
+        if (ratio > 0.66) color = '#ef4444'; // red
+        
+        hex.properties.fillColor = color;
+        hex.properties.fillOpacity = 0.6;
+        hex.properties.color = color;
+      });
+
+      setHexGridData({ type: 'FeatureCollection', features: countedHexes });
+    } catch (e) {
+      console.error("Hexgrid generation failed", e);
+    }
+  }, [showDensityMap, features, hiddenFeatureIds]);
+
   // --- M10 Routing Logic ---
   useEffect(() => {
     if (routePoints.length === 2) {
@@ -665,6 +719,10 @@ function App() {
               <button onClick={toggleTracking} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition flex items-center gap-1 ${isTracking ? 'text-blue-400 bg-blue-500/10' : 'text-white/80'}`}>
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
                 Locate Me
+              </button>
+              <button onClick={() => setShowDensityMap(!showDensityMap)} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition border-l border-white/10 flex items-center gap-1 ${showDensityMap ? 'text-orange-400 bg-orange-500/10' : 'text-white/80'}`}>
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                Density
               </button>
             </div>
               <button onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
@@ -883,6 +941,20 @@ function App() {
           {/* Render live location */}
           {liveLocation && (
             <Marker position={liveLocation} icon={liveLocationIcon} zIndexOffset={1000} />
+          )}
+
+          {/* Render Hexbin Density Map */}
+          {showDensityMap && hexGridData && (
+            <GeoJSON 
+              data={hexGridData} 
+              key={`hexgrid-${hexGridData.features.length}`}
+              style={(feature) => ({
+                fillColor: feature.properties.fillColor,
+                fillOpacity: feature.properties.fillOpacity,
+                color: feature.properties.color,
+                weight: 1
+              })}
+            />
           )}
 
           {visibleFeatures && visibleFeatures.features && visibleFeatures.features.length > 0 && (
