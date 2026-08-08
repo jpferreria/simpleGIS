@@ -29,6 +29,30 @@ const liveLocationIcon = L.divIcon({
   iconAnchor: [8, 8]
 });
 
+// M12: Basemap Providers
+const BASEMAPS = {
+  osm: {
+    name: 'Standard (OSM)',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors'
+  },
+  satellite: {
+    name: 'Satellite (Esri)',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  },
+  dark: {
+    name: 'Dark Matter',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+  },
+  topo: {
+    name: 'Topographic',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; OpenTopoMap'
+  }
+};
+
 function GeomanSetup({ onCreated }) {
   const map = useMap();
 
@@ -122,6 +146,9 @@ function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [liveLocation, setLiveLocation] = useState(null);
   const watchIdRef = useRef(null);
+
+  // M12 State (Basemaps)
+  const [activeBasemap, setActiveBasemap] = useState('osm');
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -351,7 +378,7 @@ function App() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setLiveLocation([latitude, longitude]);
-          setJumpTo([latitude, longitude]); // Auto-pan follow mode
+          setJumpTo({ center: [latitude, longitude] }); // Auto-pan follow mode
         },
         (error) => {
           console.error("Geolocation error:", error);
@@ -820,11 +847,29 @@ function App() {
       </div>
 
       <main className="flex-1 relative z-0 flex">
-        <MapContainer center={position} zoom={13} zoomControl={false} className="h-full w-full absolute inset-0 z-0" ref={mapRef}>
+      {/* Basemap Switcher Widget */}
+      <div className="absolute bottom-6 left-6 z-[1000] flex flex-col gap-1.5 bg-slate-900/70 backdrop-blur-md border border-white/10 p-2 rounded-xl shadow-2xl w-40 transition-all">
+        <div className="text-[9px] text-white/50 uppercase tracking-widest font-bold px-2 mb-1 flex items-center gap-1">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+          Map Style
+        </div>
+        {Object.entries(BASEMAPS).map(([key, mapConfig]) => (
+          <button 
+            key={key} 
+            onClick={() => setActiveBasemap(key)}
+            className={`text-left px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 shadow-sm ${activeBasemap === key ? 'bg-blue-500 text-white border border-blue-400' : 'text-white/70 hover:bg-white/10 border border-transparent hover:text-white'}`}
+          >
+            {mapConfig.name}
+          </button>
+        ))}
+      </div>
+
+      <div className={`h-full w-full absolute inset-0 z-0 transition-all duration-300 ${isDraggingOver ? 'brightness-50' : ''}`}>
+        <MapContainer center={position} zoom={13} zoomControl={false} className="h-full w-full" ref={mapRef}>
           <ZoomControl position="bottomright" />
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution={BASEMAPS[activeBasemap].attribution}
+            url={BASEMAPS[activeBasemap].url}
           />
           
           <GeomanSetup onCreated={onCreated} />
