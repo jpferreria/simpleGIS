@@ -566,6 +566,30 @@ function App() {
       .then(() => fetchFeatures());
   };
 
+  // --- M15 Spatial Buffering ---
+  const generateBuffer = async (feature) => {
+    try {
+      // Generate a 500 meter (0.5 km) buffer around the selected feature
+      const buffered = turf.buffer(feature, 0.5, { units: 'kilometers' });
+      
+      buffered.properties = {
+        name: `${feature.properties?.name || 'Feature'} (500m Buffer)`,
+        color: '#a855f7', // purple-500
+        description: 'Generated 500m spatial buffer.'
+      };
+
+      await fetch('http://localhost:3001/api/features', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buffered)
+      });
+      fetchFeatures();
+    } catch (e) {
+      console.error("Failed to generate buffer:", e);
+      alert("Failed to generate buffer. Ensure the geometry is valid.");
+    }
+  };
+
   // --- M13 Hexbin Density Mapping ---
   useEffect(() => {
     if (!showDensityMap || !features.features.length) {
@@ -813,13 +837,16 @@ function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1 text-white/50 hover:text-white transition">
+                    <button onClick={(e) => { e.stopPropagation(); generateBuffer(f); }} className="p-1 text-white/50 hover:text-purple-400 transition" title="Generate 500m Buffer">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+                    </button>
+                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1 text-white/50 hover:text-white transition" title="Toggle Visibility">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         {isHidden ? <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path> : <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>}
                         {!isHidden && <circle cx="12" cy="12" r="3"></circle>}
                       </svg>
                     </button>
-                    <button onClick={() => deleteFeature(f.id)} className="p-1 text-white/50 hover:text-red-400 transition"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                    <button onClick={() => deleteFeature(f.id)} className="p-1 text-white/50 hover:text-red-400 transition" title="Delete Feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                   </div>
                 </div>
               );
