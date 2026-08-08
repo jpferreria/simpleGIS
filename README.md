@@ -26,6 +26,13 @@ A modern, full-stack Geographic Information System (GIS) built with React, Leafl
 
 ## Getting Started
 
+### Docker Deployment (Recommended)
+The easiest way to run LiteGIS is via Docker Compose, which handles all dependencies (Nginx, Node, SQLite) automatically:
+1. Ensure you have Docker and Docker Compose installed.
+2. Run `docker-compose up -d --build` in the root directory.
+3. Access the app at `http://localhost:8080`.
+*(Note: Your map data is safely persisted in a Docker volume).*
+
 ### Prerequisites
 - Node.js (v18+)
 - SQLite3

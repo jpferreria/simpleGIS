@@ -123,7 +123,7 @@ function GeomanSetup({ onCreated }) {
 }
 
 // Helper component to jump map to bounds
-function MapController({ jumpTo, routingMode, routePoints, setRoutePoints }) {
+function MapController({ jumpTo, routingMode, setRoutePoints }) {
   const map = useMap();
   
   useMapEvents({
@@ -397,16 +397,6 @@ function App() {
     a.download = "litegis_export.md";
     document.body.appendChild(a);
     a.click();
-  };
-
-  const exportToGeoJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(features));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "litegis_export.geojson");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
   };
 
   // --- M11 Geolocation Logic ---
