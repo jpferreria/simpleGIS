@@ -250,6 +250,75 @@ function App() {
     });
   };
 
+  // LLM Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [messages, setMessages] = useState([{ sender: 'ai', text: 'Hello! Ask me what is on the map, or tell me to draw a point.' }]);
+  const [chatInput, setChatInput] = useState('');
+  const messagesEndRef = useRef(null);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isChatOpen]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMsg = chatInput.trim();
+    setMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
+    setChatInput('');
+
+    // Simulated NLP heuristics
+    const text = userMsg.toLowerCase();
+    
+    try {
+      if (text.includes('what') || text.includes('map') || text.includes('how many')) {
+        // Query Map Data
+        const res = await fetch('http://localhost:3001/api/llm/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: userMsg, action: 'get_map_data' })
+        });
+        const data = await res.json();
+        setMessages(prev => [...prev, { sender: 'ai', text: data.response_to_llm }]);
+      } 
+      else if (text.includes('draw') || text.includes('add') || text.includes('point') || text.includes('marker')) {
+        // Add a Point Feature (randomize slightly around default center)
+        const latOffset = (Math.random() - 0.5) * 0.05;
+        const lngOffset = (Math.random() - 0.5) * 0.05;
+        const payload = {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-0.09 + lngOffset, 51.505 + latOffset] // GeoJSON is [lng, lat]
+          },
+          properties: { name: 'AI Generated Point' }
+        };
+
+        const res = await fetch('http://localhost:3001/api/llm/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: userMsg, action: 'add_feature', payload })
+        });
+        const data = await res.json();
+        setMessages(prev => [...prev, { sender: 'ai', text: data.response_to_llm + '. The map will now refresh.' }]);
+        fetchFeatures(); // Refresh map data to show the new point
+      } 
+      else {
+        // Fallback
+        setTimeout(() => {
+          setMessages(prev => [...prev, { sender: 'ai', text: "I'm a simple AI. Try saying 'What is on the map?' or 'Add a point'." }]);
+        }, 500);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [...prev, { sender: 'ai', text: "Error communicating with the backend API." }]);
+    }
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-900 font-sans overflow-hidden">
       
@@ -281,6 +350,57 @@ function App() {
           </div>
         </header>
       </Draggable>
+
+      {/* Floating Chat UI */}
+      <div className="absolute bottom-6 right-6 z-[1001] flex flex-col items-end pointer-events-none">
+        
+        {isChatOpen && (
+          <div className="bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl w-80 h-96 mb-4 shadow-2xl flex flex-col overflow-hidden pointer-events-auto transform transition-all animate-in slide-in-from-bottom-5">
+            <div className="bg-white/10 px-4 py-3 border-b border-white/10 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                <h3 className="text-white text-sm font-semibold tracking-wide">GIS Assistant</h3>
+              </div>
+              <button onClick={() => setIsChatOpen(false)} className="text-white/50 hover:text-white transition">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
+              {messages.map((msg, i) => (
+                <div key={i} className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white self-end rounded-br-sm' : 'bg-white/10 text-white/90 self-start rounded-bl-sm border border-white/5'}`}>
+                  {msg.text}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <form onSubmit={handleSendMessage} className="p-3 border-t border-white/10 bg-black/20 flex gap-2">
+              <input 
+                type="text" 
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Ask me to draw something..." 
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-500 transition-colors"
+              />
+              <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 flex items-center justify-center transition">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </form>
+          </div>
+        )}
+
+        <button 
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all transform hover:scale-105 active:scale-95 pointer-events-auto ${isChatOpen ? 'bg-slate-800 border border-white/20 text-white' : 'bg-gradient-to-tr from-blue-600 to-indigo-500 text-white'}`}
+        >
+          {isChatOpen ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          )}
+        </button>
+      </div>
 
       <main className="flex-1 relative z-0 flex">
         <MapContainer center={position} zoom={13} className="h-full w-full absolute inset-0 z-0" ref={mapRef}>
