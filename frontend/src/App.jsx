@@ -38,6 +38,54 @@ function GeomanSetup({ onCreated }) {
 
     map.on('pm:create', handleCreate);
 
+    // Make the Geoman toolbar draggable
+    setTimeout(() => {
+      const toolbars = document.querySelectorAll('.leaflet-pm-toolbar');
+      toolbars.forEach(toolbar => {
+        toolbar.style.position = 'absolute';
+        toolbar.style.cursor = 'move';
+        
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        const onMouseDown = (e) => {
+          // Ignore if clicking on a button inside the toolbar
+          if (e.target.tagName.toLowerCase() === 'a' || e.target.closest('a')) return;
+          
+          isDragging = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          
+          const rect = toolbar.getBoundingClientRect();
+          const mapRect = map.getContainer().getBoundingClientRect();
+          initialLeft = rect.left - mapRect.left;
+          initialTop = rect.top - mapRect.top;
+          
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+          e.preventDefault();
+        };
+
+        const onMouseMove = (e) => {
+          if (!isDragging) return;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          toolbar.style.left = `${initialLeft + dx}px`;
+          toolbar.style.top = `${initialTop + dy}px`;
+          toolbar.style.marginTop = '0';
+          toolbar.style.marginLeft = '0';
+        };
+
+        const onMouseUp = () => {
+          isDragging = false;
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        toolbar.addEventListener('mousedown', onMouseDown);
+      });
+    }, 500);
+
     return () => {
       map.pm.removeControls();
       map.off('pm:create', handleCreate);
