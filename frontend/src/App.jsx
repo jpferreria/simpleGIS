@@ -796,7 +796,7 @@ function App() {
       )}
 
       {/* Floating Chat UI */}
-      <div className="absolute bottom-6 right-6 z-[1001] flex flex-col items-end pointer-events-none">
+      <div className="absolute bottom-6 right-20 z-[1001] flex flex-col items-end pointer-events-none">
         
         {isChatOpen && (
           <div className="bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl w-80 h-96 mb-4 shadow-2xl flex flex-col overflow-hidden pointer-events-auto transform transition-all animate-in slide-in-from-bottom-5">
@@ -894,6 +894,7 @@ function App() {
           )}
 
         </MapContainer>
+      </div>
       </main>
     </div>
   );
