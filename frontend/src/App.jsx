@@ -310,7 +310,8 @@ function App() {
       const dlAnchorElem = document.createElement('a');
       dlAnchorElem.setAttribute("href", imgData);
       // In a real app we'd use dom-to-image or leaflet-image. 
-    alert("Image export triggered (Requires html2canvas/dom-to-image implementation)");
+      alert("Image export triggered (Requires html2canvas/dom-to-image implementation)");
+    });
   };
 
   const processImportFile = async (file) => {
