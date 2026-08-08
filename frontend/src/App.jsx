@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap, ZoomControl, useMapEvents } from 'react-leaflet';
 import html2canvas from 'html2canvas';
 import * as turf from '@turf/turf';
 
@@ -69,8 +69,17 @@ function GeomanSetup({ onCreated }) {
 }
 
 // Helper component to jump map to bounds
-function MapController({ jumpTo }) {
+function MapController({ jumpTo, routingMode, routePoints, setRoutePoints }) {
   const map = useMap();
+  
+  useMapEvents({
+    click(e) {
+      if (routingMode) {
+        setRoutePoints(prev => [...prev, e.latlng]);
+      }
+    }
+  });
+
   useEffect(() => {
     if (jumpTo) {
       if (jumpTo.bounds) {
@@ -97,6 +106,10 @@ function App() {
   // M9 State (Imports)
   const fileInputRef = useRef(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  // M10 State (Routing)
+  const [routingMode, setRoutingMode] = useState(false);
+  const [routePoints, setRoutePoints] = useState([]);
 
   const fetchFeatures = () => {
     fetch('http://localhost:3001/api/features')
@@ -455,14 +468,51 @@ function App() {
     }
   };
 
-  const deleteFeature = async (id) => {
-    if (confirm("Are you sure you want to delete this feature?")) {
-      try {
-        await fetch(`http://localhost:3001/api/features/${id}`, { method: 'DELETE' });
+  const deleteFeature = (id) => {
+    fetch(`http://localhost:3001/api/features/${id}`, { method: 'DELETE' })
+      .then(() => fetchFeatures());
+  };
+
+  // --- M10 Routing Logic ---
+  useEffect(() => {
+    if (routePoints.length === 2) {
+      calculateRoute(routePoints[0], routePoints[1]);
+      setRoutePoints([]); // reset points
+      setRoutingMode(false); // exit mode
+    }
+  }, [routePoints]);
+
+  const calculateRoute = async (start, end) => {
+    // OSRM expects lon,lat format
+    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.code === 'Ok' && data.routes.length > 0) {
+        const routeGeoJSON = data.routes[0].geometry;
+        const distanceKm = (data.routes[0].distance / 1000).toFixed(2);
+        const durationMin = (data.routes[0].duration / 60).toFixed(1);
+        
+        await fetch('http://localhost:3001/api/features', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'Feature',
+            geometry: routeGeoJSON,
+            properties: {
+              name: `Route (${distanceKm} km)`,
+              color: '#ef4444',
+              description: `Driving route taking approximately ${durationMin} minutes.`
+            }
+          })
+        });
         fetchFeatures();
-      } catch (e) {
-        console.error("Delete error", e);
+      } else {
+        alert("No driving route found between these points.");
       }
+    } catch (err) {
+      console.error(err);
+      alert("Routing service failed.");
     }
   };
 
@@ -496,8 +546,8 @@ function App() {
       
       {/* Draggable Glassmorphism Toolbar */}
       <Draggable handle=".drag-handle" bounds="parent">
-        <header className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-lg border border-white/10 shadow-2xl flex items-center gap-3 w-max hover:bg-slate-900/70 transition-colors duration-200">
-          
+        <header className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-lg border border-white/10 shadow-2xl flex flex-col w-max hover:bg-slate-900/70 transition-colors duration-200">
+          <div className="flex items-center gap-3">
           <div className="drag-handle cursor-grab active:cursor-grabbing text-white/40 hover:text-white/80 transition px-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
           </div>
@@ -529,7 +579,18 @@ function App() {
                 Snap
               </button>
             </div>
-            <button onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
+              <button onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
+            </div>
+          </div>
+          
+          <div className="flex justify-center mt-2 pb-2">
+             <button 
+                onClick={() => { setRoutingMode(!routingMode); setRoutePoints([]); }}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold shadow-lg transition-all transform active:scale-95 ${routingMode ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white/80 border border-white/10 hover:bg-white/20'}`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                {routingMode ? (routePoints.length === 1 ? 'Select End Point...' : 'Select Start Point...') : 'Plan Route'}
+              </button>
           </div>
         </header>
       </Draggable>
@@ -706,6 +767,12 @@ function App() {
           />
           
           <GeomanSetup onCreated={onCreated} />
+          <MapController jumpTo={jumpTo} routingMode={routingMode} routePoints={routePoints} setRoutePoints={setRoutePoints} />
+
+          {/* Render temp route points */}
+          {routePoints.map((pt, idx) => (
+            <Marker key={`rp-${idx}`} position={pt} />
+          ))}
 
           {visibleFeatures && visibleFeatures.features && visibleFeatures.features.length > 0 && (
             <GeoJSON 
