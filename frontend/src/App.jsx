@@ -49,21 +49,20 @@ function GeomanSetup({ onCreated }) {
         let startX, startY, initialLeft, initialTop;
 
         const onMouseDown = (e) => {
-          // Ignore if clicking on a button inside the toolbar
           if (e.target.tagName.toLowerCase() === 'a' || e.target.closest('a')) return;
           
           isDragging = true;
           startX = e.clientX;
           startY = e.clientY;
           
-          const rect = toolbar.getBoundingClientRect();
-          const mapRect = map.getContainer().getBoundingClientRect();
-          initialLeft = rect.left - mapRect.left;
-          initialTop = rect.top - mapRect.top;
+          initialLeft = toolbar.offsetLeft;
+          initialTop = toolbar.offsetTop;
+          
+          // Disable transitions during drag for smoothness
+          toolbar.style.transition = 'none';
           
           document.addEventListener('mousemove', onMouseMove);
           document.addEventListener('mouseup', onMouseUp);
-          e.preventDefault();
         };
 
         const onMouseMove = (e) => {
@@ -72,8 +71,7 @@ function GeomanSetup({ onCreated }) {
           const dy = e.clientY - startY;
           toolbar.style.left = `${initialLeft + dx}px`;
           toolbar.style.top = `${initialTop + dy}px`;
-          toolbar.style.marginTop = '0';
-          toolbar.style.marginLeft = '0';
+          toolbar.style.margin = '0'; // Clear Leaflet's default margins
         };
 
         const onMouseUp = () => {
