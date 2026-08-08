@@ -275,47 +275,25 @@ function App() {
     const text = userMsg.toLowerCase();
     
     try {
-      if (text.includes('what') || text.includes('map') || text.includes('how many')) {
-        // Query Map Data
-        const res = await fetch('http://localhost:3001/api/llm/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userMsg, action: 'get_map_data' })
-        });
-        const data = await res.json();
+      const res = await fetch('http://localhost:3001/api/llm/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userMsg, action: 'chat' })
+      });
+      
+      const data = await res.json();
+      
+      if (data.error) {
+        setMessages(prev => [...prev, { sender: 'ai', text: data.error }]);
+      } else {
         setMessages(prev => [...prev, { sender: 'ai', text: data.response_to_llm }]);
-      } 
-      else if (text.includes('draw') || text.includes('add') || text.includes('point') || text.includes('marker')) {
-        // Add a Point Feature (randomize slightly around default center)
-        const latOffset = (Math.random() - 0.5) * 0.05;
-        const lngOffset = (Math.random() - 0.5) * 0.05;
-        const payload = {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [-0.09 + lngOffset, 51.505 + latOffset] // GeoJSON is [lng, lat]
-          },
-          properties: { name: 'AI Generated Point' }
-        };
-
-        const res = await fetch('http://localhost:3001/api/llm/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userMsg, action: 'add_feature', payload })
-        });
-        const data = await res.json();
-        setMessages(prev => [...prev, { sender: 'ai', text: data.response_to_llm + '. The map will now refresh.' }]);
-        fetchFeatures(); // Refresh map data to show the new point
-      } 
-      else {
-        // Fallback
-        setTimeout(() => {
-          setMessages(prev => [...prev, { sender: 'ai', text: "I'm a simple AI. Try saying 'What is on the map?' or 'Add a point'." }]);
-        }, 500);
+        if (data.refreshRequired) {
+          fetchFeatures();
+        }
       }
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, { sender: 'ai', text: "Error communicating with the backend API." }]);
+      setMessages(prev => [...prev, { sender: 'ai', text: "Error communicating with the backend API. Make sure Ollama is running!" }]);
     }
   };
 
