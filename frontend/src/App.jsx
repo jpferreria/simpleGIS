@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap, ZoomControl } from 'react-leaflet';
 import html2canvas from 'html2canvas';
 import * as turf from '@turf/turf';
 
@@ -27,7 +27,7 @@ function GeomanSetup({ onCreated }) {
 
   useEffect(() => {
     map.pm.addControls({
-      position: 'topleft',
+      position: 'topright',
       drawCircleMarker: false,
       drawCircle: false,
       drawText: false,
@@ -698,7 +698,8 @@ function App() {
       </div>
 
       <main className="flex-1 relative z-0 flex">
-        <MapContainer center={position} zoom={13} className="h-full w-full absolute inset-0 z-0" ref={mapRef}>
+        <MapContainer center={position} zoom={13} zoomControl={false} className="h-full w-full absolute inset-0 z-0" ref={mapRef}>
+          <ZoomControl position="bottomright" />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
