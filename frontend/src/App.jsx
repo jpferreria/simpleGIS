@@ -29,7 +29,7 @@ function GeomanSetup({ onCreated }) {
       drawCircleMarker: false,
       drawCircle: false,
       drawText: false,
-      editControls: false,
+      editControls: true, // Enabled edits, drags, and removals
     });
 
     const handleCreate = (e) => {
@@ -184,6 +184,38 @@ function App() {
         dashArray: '5, 5'
       });
     }
+
+    // Bind Edit Events
+    const handleUpdate = async (e) => {
+      const updatedGeoJson = e.target.toGeoJSON();
+      try {
+        await fetch(`http://localhost:3001/api/features/${feature.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            geometry: updatedGeoJson.geometry,
+            properties: feature.properties
+          })
+        });
+      } catch (err) {
+        console.error("Error updating feature:", err);
+      }
+    };
+
+    const handleDelete = async () => {
+      try {
+        await fetch(`http://localhost:3001/api/features/${feature.id}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.error("Error deleting feature:", err);
+      }
+    };
+
+    layer.on('pm:edit', handleUpdate);
+    layer.on('pm:dragend', handleUpdate);
+    layer.on('pm:markerdragend', handleUpdate);
+    layer.on('pm:remove', handleDelete);
   };
 
   // Export functions
