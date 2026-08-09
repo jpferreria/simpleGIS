@@ -84,7 +84,7 @@ function GeomanSetup({ onCreated }) {
       position: 'topright',
       drawCircleMarker: false,
       drawCircle: false,
-      drawText: false,
+      drawText: true,
       editControls: true, // Enabled edits, drags, and removals
     });
 
@@ -1151,7 +1151,7 @@ function App() {
       )}
       
       {/* Geocoding Search Bar */}
-      <div className="absolute top-4 right-4 z-[1000] w-72 flex flex-col gap-1">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-80 flex flex-col gap-1">
         <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl flex items-center px-3 py-2 transition-all focus-within:border-blue-500/50">
           <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input 
