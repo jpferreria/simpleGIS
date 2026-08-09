@@ -422,10 +422,18 @@ function App() {
         },
         (error) => {
           console.error("Geolocation error:", error);
-          alert("Unable to retrieve your location.");
+          let errorMessage = "Unable to retrieve your location.";
+          if (error.code === 1) { // PERMISSION_DENIED
+            errorMessage = "Location access was denied. Please allow location permissions in your browser settings.";
+          } else if (error.code === 2) { // POSITION_UNAVAILABLE
+            errorMessage = "Location information is unavailable.";
+          } else if (error.code === 3) { // TIMEOUT
+            errorMessage = "The location request timed out. Trying again or moving to a clearer area might help.";
+          }
+          alert(errorMessage);
           setIsTracking(false);
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
       );
       watchIdRef.current = id;
       setIsTracking(true);
