@@ -192,6 +192,7 @@ function App() {
   // M19 State (Elevation Profiling)
   const [elevationData, setElevationData] = useState(null);
   const [isFetchingElevation, setIsFetchingElevation] = useState(false);
+  const [isSimulatingRunoff, setIsSimulatingRunoff] = useState(false);
 
   const fetchFeatures = () => {
     fetch('/api/features')
@@ -744,6 +745,166 @@ function App() {
     }
   };
 
+  const simulateRunoff = async (polygonFeature) => {
+    setIsSimulatingRunoff(true);
+    try {
+      const bbox = turf.bbox(polygonFeature);
+      const z = 13;
+      
+      const lon2tile = (lon, zoom) => Math.floor((lon + 180) / 360 * Math.pow(2, zoom));
+      const lat2tile = (lat, zoom) => Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+      
+      const minX = lon2tile(bbox[0], z);
+      const maxX = lon2tile(bbox[2], z);
+      const maxY = lat2tile(bbox[1], z); 
+      const minY = lat2tile(bbox[3], z); 
+  
+      if ((maxX - minX) > 2 || (maxY - minY) > 2) {
+        alert("Area too large! Please draw a smaller polygon to simulate runoff.");
+        setIsSimulatingRunoff(false);
+        return;
+      }
+  
+      const cols = maxX - minX + 1;
+      const rows = maxY - minY + 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = cols * 256;
+      canvas.height = rows * 256;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  
+      const promises = [];
+      for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+          promises.push(new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+              ctx.drawImage(img, (x - minX) * 256, (y - minY) * 256);
+              resolve();
+            };
+            img.onerror = () => {
+              console.warn(`Tile failed to load: ${z}/${x}/${y}`);
+              resolve(); // ignore missing tiles gracefully
+            };
+            img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+          }));
+        }
+      }
+      
+      await Promise.all(promises);
+  
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      const elevation = new Float32Array(width * height);
+      for (let i = 0; i < imgData.length; i += 4) {
+        const r = imgData[i];
+        const g = imgData[i+1];
+        const b = imgData[i+2];
+        if (r===0 && g===0 && b===0) { elevation[i/4] = 0; continue; }
+        elevation[i/4] = (r * 256 + g + b / 256) - 32768;
+      }
+      
+      const accumulation = new Float32Array(width * height);
+      for(let i = 0; i < accumulation.length; i++) accumulation[i] = 1;
+  
+      const indices = new Int32Array(width * height);
+      for (let i = 0; i < indices.length; i++) indices[i] = i;
+      indices.sort((a, b) => elevation[b] - elevation[a]);
+      
+      for (let i = 0; i < indices.length; i++) {
+        const idx = indices[i];
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+        
+        let lowestNeighbor = -1;
+        let minElev = elevation[idx];
+        
+        for (let d = 0; d < 8; d++) {
+          const dx = [-1, 0, 1, -1, 1, -1, 0, 1][d];
+          const dy = [-1, -1, -1, 0, 0, 1, 1, 1][d];
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const nIdx = ny * width + nx;
+            if (elevation[nIdx] < minElev) {
+              minElev = elevation[nIdx];
+              lowestNeighbor = nIdx;
+            }
+          }
+        }
+        
+        if (lowestNeighbor !== -1) {
+          accumulation[lowestNeighbor] += accumulation[idx];
+        }
+      }
+      
+      const floodedPointsData = [];
+      const tile2lon = (x, zoom) => (x / Math.pow(2, zoom) * 360 - 180);
+      const tile2lat = (y, zoom) => {
+        const n = Math.PI - 2 * Math.PI * y / Math.pow(2, zoom);
+        return (180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
+      };
+  
+      const accumThreshold = 50; 
+  
+      for (let idx = 0; idx < accumulation.length; idx++) {
+        if (accumulation[idx] > accumThreshold) {
+          const px = idx % width;
+          const py = Math.floor(idx / width);
+          
+          const globalTileX = minX + (px / 256);
+          const globalTileY = minY + (py / 256);
+          
+          const lng = tile2lon(globalTileX, z);
+          const lat = tile2lat(globalTileY, z);
+          
+          const pt = turf.point([lng, lat]);
+          if (turf.booleanPointInPolygon(pt, polygonFeature)) {
+            floodedPointsData.push({ lng, lat, acc: accumulation[idx] });
+          }
+        }
+      }
+      
+      if (floodedPointsData.length > 0) {
+        floodedPointsData.sort((a,b) => b.acc - a.acc);
+        const topPoints = floodedPointsData.slice(0, 1500).map(p => [p.lng, p.lat]);
+        const multiPt = turf.multiPoint(topPoints);
+        
+        const floodedPolygons = turf.buffer(multiPt, 0.05, { units: 'kilometers' });
+        
+        const newFeature = {
+          type: 'Feature',
+          geometry: floodedPolygons.geometry,
+          properties: {
+            id: crypto.randomUUID(),
+            name: `Flood Zone (Simulation)`,
+            color: '#0ea5e9',
+            description: `Simulated heavy rain runoff accumulation. Based on ${topPoints.length} convergence points.`
+          }
+        };
+  
+        await fetch('/api/features', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newFeature)
+        });
+        fetchFeatures();
+        if (editingFeature && editingFeature.id === polygonFeature.properties.id) {
+          setEditingFeature(null);
+        }
+      } else {
+        alert("No significant flood zones found within this area. Try drawing over steeper terrain.");
+      }
+      
+    } catch(e) {
+      console.error("Runoff sim error", e);
+      alert("Simulation failed. Check console for details.");
+    }
+    setIsSimulatingRunoff(false);
+  };
+
   // --- M15 Spatial Buffering ---
   const generateBuffer = async (feature) => {
     try {
@@ -1241,6 +1402,21 @@ function App() {
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h20M5 20l4-8 5 4 8-12"/></svg>
                     <div className="text-sm font-medium">{isFetchingElevation ? 'Fetching...' : 'Generate Elevation Profile'}</div>
+                  </button>
+                </div>
+              )}
+              {(editingFeature.geometry.type === 'Polygon' || editingFeature.geometry.type === 'MultiPolygon') && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <button 
+                    type="button"
+                    onClick={() => { simulateRunoff(editingFeature); }}
+                    disabled={isSimulatingRunoff}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/20 rounded-xl transition disabled:opacity-50"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                    </svg>
+                    <div className="text-sm font-medium">{isSimulatingRunoff ? 'Simulating...' : 'Simulate Rain Run-off'}</div>
                   </button>
                 </div>
               )}
