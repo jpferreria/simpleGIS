@@ -847,7 +847,21 @@ function App() {
         return (180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
       };
   
-      const accumThreshold = 50; 
+      let accumThreshold = 100; // default (light/no rain)
+      let rainMM = 0;
+      try {
+        const center = turf.center(polygonFeature).geometry.coordinates;
+        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${center[1]}&longitude=${center[0]}&current=precipitation,rain&timezone=auto`);
+        if (weatherRes.ok) {
+          const weatherData = await weatherRes.json();
+          rainMM = weatherData.current?.precipitation || 0;
+          if (rainMM > 5) { accumThreshold = 20; } // heavy rain
+          else if (rainMM > 1) { accumThreshold = 50; } // moderate rain
+          else if (rainMM > 0) { accumThreshold = 80; } // light rain
+        }
+      } catch (err) {
+        console.warn("Could not fetch live weather, using default threshold.", err);
+      }
   
       for (let idx = 0; idx < accumulation.length; idx++) {
         if (accumulation[idx] > accumThreshold) {
@@ -879,9 +893,9 @@ function App() {
           geometry: floodedPolygons.geometry,
           properties: {
             id: crypto.randomUUID(),
-            name: `Flood Zone (Simulation)`,
+            name: `Flood Zone (${rainMM}mm Rain)`,
             color: '#0ea5e9',
-            description: `Simulated heavy rain runoff accumulation. Based on ${topPoints.length} convergence points.`
+            description: `Simulated heavy rain runoff accumulation. Based on ${topPoints.length} convergence points. Live Rainfall: ${rainMM}mm.`
           }
         };
   
