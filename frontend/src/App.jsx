@@ -1182,7 +1182,7 @@ function App() {
 
       {/* Draggable Glassmorphism Toolbar */}
       <Draggable handle=".drag-handle" bounds="parent">
-        <header className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-lg border border-white/10 shadow-2xl flex flex-col w-max hover:bg-slate-900/70 transition-colors duration-200">
+        <header className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-lg border border-white/10 shadow-2xl flex flex-col w-max hover:bg-slate-900/70 transition-colors duration-200">
           <div className="flex items-center gap-3">
           <div className="drag-handle cursor-grab active:cursor-grabbing text-white/40 hover:text-white/80 transition px-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
