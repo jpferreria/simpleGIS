@@ -193,6 +193,8 @@ function App() {
   const [elevationData, setElevationData] = useState(null);
   const [isFetchingElevation, setIsFetchingElevation] = useState(false);
   const [isSimulatingRunoff, setIsSimulatingRunoff] = useState(false);
+  const [simulationProgress, setSimulationProgress] = useState({ progress: 0, status: '' });
+  const cancelSimulationRef = useRef(false);
 
   const fetchFeatures = () => {
     fetch('/api/features')
@@ -747,7 +749,22 @@ function App() {
 
   const simulateRunoff = async (polygonFeature) => {
     setIsSimulatingRunoff(true);
+    cancelSimulationRef.current = false;
+    setSimulationProgress({ progress: 5, status: 'Initializing simulation area...' });
+
+    const checkCancel = () => {
+      if (cancelSimulationRef.current) {
+        setIsSimulatingRunoff(false);
+        setSimulationProgress({ progress: 0, status: '' });
+        return true;
+      }
+      return false;
+    };
+
     try {
+      await new Promise(r => setTimeout(r, 50));
+      if (checkCancel()) return;
+
       const bbox = turf.bbox(polygonFeature);
       const z = 13;
       
@@ -767,32 +784,62 @@ function App() {
   
       const cols = maxX - minX + 1;
       const rows = maxY - minY + 1;
+      const totalTiles = cols * rows;
+
+      setSimulationProgress({ progress: 15, status: `Fetching live weather data...` });
+      await new Promise(r => setTimeout(r, 50));
+      if (checkCancel()) return;
+
+      let accumThreshold = 100; // default (light/no rain)
+      let rainMM = 0;
+      try {
+        const center = turf.center(polygonFeature).geometry.coordinates;
+        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${center[1]}&longitude=${center[0]}&current=precipitation,rain&timezone=auto`);
+        if (weatherRes.ok) {
+          const weatherData = await weatherRes.json();
+          rainMM = weatherData.current?.precipitation || 0;
+          if (rainMM > 5) { accumThreshold = 20; } 
+          else if (rainMM > 1) { accumThreshold = 50; } 
+          else if (rainMM > 0) { accumThreshold = 80; } 
+        }
+      } catch (err) {
+        console.warn("Could not fetch live weather.", err);
+      }
+  
+      setSimulationProgress({ progress: 30, status: `Downloading ${totalTiles} terrain tiles...` });
+      
       const canvas = document.createElement('canvas');
       canvas.width = cols * 256;
       canvas.height = rows * 256;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
   
+      let loadedTiles = 0;
       const promises = [];
       for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
-          promises.push(new Promise((resolve, reject) => {
+          promises.push(new Promise((resolve) => {
             const img = new Image();
             img.crossOrigin = 'Anonymous';
             img.onload = () => {
+              if (cancelSimulationRef.current) return resolve();
               ctx.drawImage(img, (x - minX) * 256, (y - minY) * 256);
+              loadedTiles++;
+              setSimulationProgress({ progress: 30 + Math.floor((loadedTiles/totalTiles)*20), status: `Downloading terrain (${loadedTiles}/${totalTiles})...` });
               resolve();
             };
-            img.onerror = () => {
-              console.warn(`Tile failed to load: ${z}/${x}/${y}`);
-              resolve(); // ignore missing tiles gracefully
-            };
+            img.onerror = () => resolve(); // ignore missing tiles
             img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
           }));
         }
       }
       
       await Promise.all(promises);
+      if (checkCancel()) return;
   
+      setSimulationProgress({ progress: 55, status: 'Decoding elevation models...' });
+      await new Promise(r => setTimeout(r, 50));
+      if (checkCancel()) return;
+
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       const width = canvas.width;
       const height = canvas.height;
@@ -806,6 +853,10 @@ function App() {
         elevation[i/4] = (r * 256 + g + b / 256) - 32768;
       }
       
+      setSimulationProgress({ progress: 70, status: 'Running physical flow simulation...' });
+      await new Promise(r => setTimeout(r, 50));
+      if (checkCancel()) return;
+
       const accumulation = new Float32Array(width * height);
       for(let i = 0; i < accumulation.length; i++) accumulation[i] = 1;
   
@@ -814,6 +865,7 @@ function App() {
       indices.sort((a, b) => elevation[b] - elevation[a]);
       
       for (let i = 0; i < indices.length; i++) {
+        if (i % 10000 === 0 && checkCancel()) return; // check occasionally during tight loop
         const idx = indices[i];
         const x = idx % width;
         const y = Math.floor(idx / width);
@@ -840,28 +892,16 @@ function App() {
         }
       }
       
+      setSimulationProgress({ progress: 90, status: 'Mapping flood zones...' });
+      await new Promise(r => setTimeout(r, 50));
+      if (checkCancel()) return;
+
       const floodedPointsData = [];
       const tile2lon = (x, zoom) => (x / Math.pow(2, zoom) * 360 - 180);
       const tile2lat = (y, zoom) => {
         const n = Math.PI - 2 * Math.PI * y / Math.pow(2, zoom);
         return (180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
       };
-  
-      let accumThreshold = 100; // default (light/no rain)
-      let rainMM = 0;
-      try {
-        const center = turf.center(polygonFeature).geometry.coordinates;
-        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${center[1]}&longitude=${center[0]}&current=precipitation,rain&timezone=auto`);
-        if (weatherRes.ok) {
-          const weatherData = await weatherRes.json();
-          rainMM = weatherData.current?.precipitation || 0;
-          if (rainMM > 5) { accumThreshold = 20; } // heavy rain
-          else if (rainMM > 1) { accumThreshold = 50; } // moderate rain
-          else if (rainMM > 0) { accumThreshold = 80; } // light rain
-        }
-      } catch (err) {
-        console.warn("Could not fetch live weather, using default threshold.", err);
-      }
   
       for (let idx = 0; idx < accumulation.length; idx++) {
         if (accumulation[idx] > accumThreshold) {
@@ -914,9 +954,13 @@ function App() {
       
     } catch(e) {
       console.error("Runoff sim error", e);
-      alert("Simulation failed. Check console for details.");
+      if (!cancelSimulationRef.current) {
+        alert("Simulation failed. Check console for details.");
+      }
     }
+    
     setIsSimulatingRunoff(false);
+    setSimulationProgress({ progress: 0, status: '' });
   };
 
   // --- M15 Spatial Buffering ---
@@ -1421,17 +1465,35 @@ function App() {
               )}
               {(editingFeature.geometry.type === 'Polygon' || editingFeature.geometry.type === 'MultiPolygon') && (
                 <div className="mt-4 pt-4 border-t border-white/10">
-                  <button 
-                    type="button"
-                    onClick={() => { simulateRunoff(editingFeature); }}
-                    disabled={isSimulatingRunoff}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/20 rounded-xl transition disabled:opacity-50"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-                    </svg>
-                    <div className="text-sm font-medium">{isSimulatingRunoff ? 'Simulating...' : 'Simulate Rain Run-off'}</div>
-                  </button>
+                  {!isSimulatingRunoff ? (
+                    <button 
+                      type="button"
+                      onClick={() => { simulateRunoff(editingFeature); }}
+                      className="w-full flex items-center justify-center gap-2 p-3 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/20 rounded-xl transition"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                      </svg>
+                      <div className="text-sm font-medium">Simulate Rain Run-off</div>
+                    </button>
+                  ) : (
+                    <div className="w-full p-3 bg-sky-900/20 border border-sky-500/20 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center text-sky-400 text-xs">
+                        <span>{simulationProgress.status || 'Simulating...'}</span>
+                        <span>{simulationProgress.progress}%</span>
+                      </div>
+                      <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-sky-400 h-1.5 rounded-full transition-all duration-300" style={{ width: `${simulationProgress.progress}%` }}></div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => { cancelSimulationRef.current = true; }}
+                        className="w-full mt-2 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-medium transition"
+                      >
+                        Cancel Simulation
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="mt-4 flex justify-end gap-2">
