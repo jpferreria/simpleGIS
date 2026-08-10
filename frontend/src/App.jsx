@@ -196,6 +196,26 @@ function App() {
   const [simulationProgress, setSimulationProgress] = useState({ progress: 0, status: '' });
   const cancelSimulationRef = useRef(false);
 
+  // M21 State (Theme)
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('litegis_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      if (activeBasemap === 'osm') setActiveBasemap('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      if (activeBasemap === 'dark') setActiveBasemap('osm');
+    }
+    localStorage.setItem('litegis_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   const fetchFeatures = () => {
     fetch('/api/features')
       .then(res => res.json())
@@ -1129,7 +1149,7 @@ function App() {
 
   return (
     <div 
-      className="h-screen w-screen flex flex-col bg-slate-900 font-sans overflow-hidden relative"
+      className="h-screen w-screen flex flex-col bg-white dark:bg-slate-900 font-sans overflow-hidden relative"
       onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
       onDragLeave={() => setIsDraggingOver(false)}
       onDrop={(e) => {
@@ -1143,7 +1163,7 @@ function App() {
       {/* Drag overlay */}
       {isDraggingOver && (
         <div className="absolute inset-0 z-[9999] bg-blue-500/20 backdrop-blur-sm border-4 border-blue-500 border-dashed flex items-center justify-center pointer-events-none">
-          <div className="bg-slate-900/90 text-white px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
+          <div className="bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-white px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
             <h2 className="text-2xl font-bold tracking-tight">Drop KML or GeoJSON to import</h2>
           </div>
@@ -1152,26 +1172,26 @@ function App() {
       
       {/* Geocoding Search Bar */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-80 flex flex-col gap-1">
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl flex items-center px-3 py-2 transition-all focus-within:border-blue-500/50">
-          <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-full shadow-2xl flex items-center px-3 py-2 transition-all focus-within:border-blue-500/50">
+          <svg className="w-4 h-4 text-slate-400 dark:text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input 
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search for places..."
-            className="bg-transparent border-none outline-none text-xs text-white placeholder-white/40 ml-2 w-full"
+            className="bg-transparent border-none outline-none text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 ml-2 w-full"
           />
           {isSearching && <div className="w-3 h-3 rounded-full border-2 border-blue-500 border-t-transparent animate-spin ml-2"></div>}
         </div>
         
         {/* Search Results Dropdown */}
         {searchResults.length > 0 && (
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden mt-1 flex flex-col max-h-60 overflow-y-auto custom-scrollbar">
+          <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden mt-1 flex flex-col max-h-60 overflow-y-auto custom-scrollbar">
             {searchResults.map((result, idx) => (
               <button 
                 key={idx} 
                 onClick={() => handleSelectSearchResult(result)}
-                className="text-left px-3 py-2 text-[10px] text-white/80 hover:bg-white/10 hover:text-white transition border-b border-white/5 last:border-b-0 leading-tight"
+                className="text-left px-3 py-2 text-[10px] text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-800 dark:text-white transition border-b border-slate-100 dark:border-white/5 last:border-b-0 leading-tight"
               >
                 {result.display_name}
               </button>
@@ -1182,21 +1202,21 @@ function App() {
 
       {/* Draggable Glassmorphism Toolbar */}
       <Draggable handle=".drag-handle" bounds="parent">
-        <header className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-lg border border-white/10 shadow-2xl flex flex-col w-max hover:bg-slate-900/70 transition-colors duration-200">
+        <header className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1 rounded-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-lg border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col w-max hover:bg-white/70 dark:bg-slate-900/70 transition-colors duration-200">
           <div className="flex items-center gap-3">
-          <div className="drag-handle cursor-grab active:cursor-grabbing text-white/40 hover:text-white/80 transition px-1">
+          <div className="drag-handle cursor-grab active:cursor-grabbing text-slate-400 dark:text-white/40 hover:text-slate-600 dark:text-white/80 transition px-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
           </div>
 
-          <div className="flex items-center gap-2 border-r border-white/10 pr-3">
+          <div className="flex items-center gap-2 border-r border-slate-200 dark:border-white/10 pr-3">
             <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-400 flex items-center justify-center shadow-lg">
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <svg className="w-3 h-3 text-slate-800 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <h1 className="text-xs font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-100 to-white tracking-tight">LiteGIS</h1>
           </div>
           
           <div className="flex gap-2 items-center">
-            <div className="flex bg-white/10 rounded-md overflow-hidden border border-white/5 shadow-inner">
+            <div className="flex bg-white/10 rounded-md overflow-hidden border border-slate-100 dark:border-white/5 shadow-inner">
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -1204,37 +1224,45 @@ function App() {
                 className="hidden" 
                 accept=".kml,.geojson,.json"
               />
-              <button onClick={() => fileInputRef.current.click()} className="hover:bg-blue-500/20 text-blue-300 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition flex items-center gap-1">
+              <button onClick={() => fileInputRef.current.click()} className="hover:bg-blue-500/20 text-blue-300 px-2.5 py-1 text-[10px] font-medium border-r border-slate-200 dark:border-white/10 transition flex items-center gap-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
                 Import
               </button>
-              <button onClick={exportToJSON} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition">JSON</button>
-              <button onClick={exportToMarkdown} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition">MD</button>
-              <button onClick={exportToImage} className="hover:bg-white/20 text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-white/10 transition flex items-center gap-1">
+              <button onClick={exportToJSON} className="hover:bg-slate-200 dark:hover:bg-white/20 text-slate-600 dark:text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-slate-200 dark:border-white/10 transition">JSON</button>
+              <button onClick={exportToMarkdown} className="hover:bg-slate-200 dark:hover:bg-white/20 text-slate-600 dark:text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-slate-200 dark:border-white/10 transition">MD</button>
+              <button onClick={exportToImage} className="hover:bg-slate-200 dark:hover:bg-white/20 text-slate-600 dark:text-white/80 px-2.5 py-1 text-[10px] font-medium border-r border-slate-200 dark:border-white/10 transition flex items-center gap-1">
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 Snap
               </button>
-              <button onClick={toggleTracking} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition flex items-center gap-1 ${isTracking ? 'text-blue-400 bg-blue-500/10' : 'text-white/80'}`}>
+              <button onClick={toggleTracking} className={`hover:bg-slate-200 dark:hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition flex items-center gap-1 ${isTracking ? 'text-blue-400 bg-blue-500/10' : 'text-slate-600 dark:text-white/80'}`}>
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
                 Locate Me
               </button>
-              <button onClick={() => setShowDensityMap(!showDensityMap)} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition border-l border-white/10 flex items-center gap-1 ${showDensityMap ? 'text-orange-400 bg-orange-500/10' : 'text-white/80'}`}>
+              <button onClick={() => setShowDensityMap(!showDensityMap)} className={`hover:bg-slate-200 dark:hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition border-l border-slate-200 dark:border-white/10 flex items-center gap-1 ${showDensityMap ? 'text-orange-400 bg-orange-500/10' : 'text-slate-600 dark:text-white/80'}`}>
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                 Density
               </button>
-              <button onClick={() => setShowDashboard(!showDashboard)} className={`hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition border-l border-white/10 flex items-center gap-1 ${showDashboard ? 'text-purple-400 bg-purple-500/10' : 'text-white/80'}`}>
+              <button onClick={toggleTheme} className="hover:bg-slate-200 dark:hover:bg-white/20 text-slate-600 dark:text-white/80 px-2.5 py-1 text-[10px] font-medium border-l border-slate-200 dark:border-white/10 transition flex items-center gap-1">
+                {theme === 'dark' ? (
+                  <svg className="w-3 h-3 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                ) : (
+                  <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                )}
+                {theme === 'dark' ? 'Light' : 'Dark'}
+              </button>
+              <button onClick={() => setShowDashboard(!showDashboard)} className={`hover:bg-slate-200 dark:hover:bg-white/20 px-2.5 py-1 text-[10px] font-medium transition border-l border-slate-200 dark:border-white/10 flex items-center gap-1 ${showDashboard ? 'text-purple-400 bg-purple-500/10' : 'text-slate-600 dark:text-white/80'}`}>
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 Metrics
               </button>
             </div>
-              <button onClick={() => window.location.href = '/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
+              <button onClick={() => window.location.href = '/api/auth/github'} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-slate-800 dark:text-white px-3 py-1 text-[10px] rounded-md font-semibold shadow-md transition-all active:scale-95 ml-1">Login</button>
             </div>
           </div>
           
           <div className="flex justify-center mt-2 pb-2">
              <button 
                 onClick={() => { setRoutingMode(!routingMode); setRoutePoints([]); }}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold shadow-lg transition-all transform active:scale-95 ${routingMode ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white/80 border border-white/10 hover:bg-white/20'}`}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold shadow-lg transition-all transform active:scale-95 ${routingMode ? 'bg-red-500 text-slate-800 dark:text-white animate-pulse' : 'bg-white/10 text-slate-600 dark:text-white/80 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/20'}`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
                 {routingMode ? (routePoints.length === 1 ? 'Select End Point...' : 'Select Start Point...') : 'Plan Route'}
@@ -1244,9 +1272,9 @@ function App() {
       </Draggable>
 
       {/* Layer Management Sidebar */}
-      <div className={`absolute top-4 left-4 bottom-4 z-[999] w-64 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
-        <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
-          <h2 className="text-white text-sm font-semibold flex items-center gap-2">
+      <div className={`absolute top-4 left-4 bottom-4 z-[999] w-64 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
+          <h2 className="text-slate-800 dark:text-white text-sm font-semibold flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             Layers
           </h2>
@@ -1255,20 +1283,20 @@ function App() {
         
         <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
           {features.features.length === 0 ? (
-            <div className="text-white/40 text-xs text-center mt-6">No layers drawn yet</div>
+            <div className="text-slate-400 dark:text-white/40 text-xs text-center mt-6">No layers drawn yet</div>
           ) : (
             features.features.map(f => {
               const isHidden = hiddenFeatureIds.has(f.id);
               
               return (
-                <div key={f.id} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg group transition">
+                <div key={f.id} className="flex items-center justify-between p-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition">
                   <div className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1" onClick={() => flyToFeature(f)}>
-                    <div className="flex items-center justify-center w-6 h-6 rounded bg-white/10 mr-2 text-[10px] text-white/50">
+                    <div className="flex items-center justify-center w-6 h-6 rounded bg-white/10 mr-2 text-[10px] text-slate-400 dark:text-white/50">
                       {f.geometry.type === 'Point' ? '•' : f.geometry.type === 'LineString' ? '—' : '⬠'}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <div className="text-sm font-medium truncate">{f.properties?.name || 'Unnamed Feature'}</div>
-                      <div className="text-[10px] text-white/40">{f.geometry.type}</div>
+                      <div className="text-[10px] text-slate-400 dark:text-white/40">{f.geometry.type}</div>
                       
                       {(f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString') && (
                         <button 
@@ -1291,16 +1319,16 @@ function App() {
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => handleToggleMultiSelect(f.id)}
                     />
-                    <button onClick={(e) => { e.stopPropagation(); generateBuffer(f); }} className="p-1 text-white/50 hover:text-purple-400 transition" title="Generate 500m Buffer">
+                    <button onClick={(e) => { e.stopPropagation(); generateBuffer(f); }} className="p-1 text-slate-400 dark:text-white/50 hover:text-purple-400 transition" title="Generate 500m Buffer">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                     </button>
-                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1 text-white/50 hover:text-white transition" title="Toggle Visibility">
+                    <button onClick={() => toggleFeatureVisibility(f.id)} className="p-1 text-slate-400 dark:text-white/50 hover:text-slate-800 dark:text-white transition" title="Toggle Visibility">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         {isHidden ? <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path> : <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>}
                         {!isHidden && <circle cx="12" cy="12" r="3"></circle>}
                       </svg>
                     </button>
-                    <button onClick={() => deleteFeature(f.id)} className="p-1 text-white/50 hover:text-red-400 transition" title="Delete Feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                    <button onClick={() => deleteFeature(f.id)} className="p-1 text-slate-400 dark:text-white/50 hover:text-red-400 transition" title="Delete Feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                   </div>
                 </div>
               );
@@ -1310,13 +1338,13 @@ function App() {
       </div>
 
       {/* Analytics Dashboard Sidebar */}
-      <div className={`absolute top-20 right-4 bottom-4 z-[999] w-80 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${showDashboard ? 'translate-x-0' : 'translate-x-[110%]'}`}>
-        <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
-          <h2 className="text-white text-sm font-semibold flex items-center gap-2">
+      <div className={`absolute top-20 right-4 bottom-4 z-[999] w-80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ${showDashboard ? 'translate-x-0' : 'translate-x-[110%]'}`}>
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
+          <h2 className="text-slate-800 dark:text-white text-sm font-semibold flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"></path></svg>
             Data Analytics
           </h2>
-          <button onClick={() => setShowDashboard(false)} className="text-white/50 hover:text-white transition">
+          <button onClick={() => setShowDashboard(false)} className="text-slate-400 dark:text-white/50 hover:text-slate-800 dark:text-white transition">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -1324,29 +1352,29 @@ function App() {
         {metrics && (
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-6">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Total Features</p>
-                <p className="text-2xl font-light text-white">{visibleFeatures.features.length}</p>
+              <div className="bg-white/5 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                <p className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Total Features</p>
+                <p className="text-2xl font-light text-slate-800 dark:text-white">{visibleFeatures.features.length}</p>
               </div>
-              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Polygons</p>
+              <div className="bg-white/5 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                <p className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Polygons</p>
                 <p className="text-xl font-light text-emerald-400">{metrics.polyCount}</p>
               </div>
             </div>
 
-            <div className="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-2">
+            <div className="bg-white/5 rounded-xl p-3 border border-slate-100 dark:border-white/5 flex flex-col gap-2">
               <div className="flex justify-between items-end">
-                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider">Total Area</p>
-                <p className="text-lg font-medium text-emerald-400">{metrics.totalAreaSqKm} <span className="text-xs text-white/50">sq km</span></p>
+                <p className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold tracking-wider">Total Area</p>
+                <p className="text-lg font-medium text-emerald-400">{metrics.totalAreaSqKm} <span className="text-xs text-slate-400 dark:text-white/50">sq km</span></p>
               </div>
-              <div className="flex justify-between items-end border-t border-white/5 pt-2">
-                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider">Total Length</p>
-                <p className="text-lg font-medium text-blue-400">{metrics.totalLengthKm} <span className="text-xs text-white/50">km</span></p>
+              <div className="flex justify-between items-end border-t border-slate-100 dark:border-white/5 pt-2">
+                <p className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold tracking-wider">Total Length</p>
+                <p className="text-lg font-medium text-blue-400">{metrics.totalLengthKm} <span className="text-xs text-slate-400 dark:text-white/50">km</span></p>
               </div>
             </div>
 
             <div className="flex-1 min-h-[200px] flex flex-col">
-              <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-2">Feature Distribution</p>
+              <p className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold tracking-wider mb-2">Feature Distribution</p>
               {metrics.chartData.length > 0 ? (
                 <div className="flex-1">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1374,7 +1402,7 @@ function App() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-white/20 text-xs">No data to chart</div>
+                <div className="flex-1 flex items-center justify-center text-slate-800 dark:text-white/20 text-xs">No data to chart</div>
               )}
             </div>
           </div>
@@ -1384,7 +1412,7 @@ function App() {
       {/* Sidebar Toggle Button */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="absolute top-4 left-0 z-[1000] bg-slate-900/80 backdrop-blur-xl border border-white/10 p-2 rounded-r-lg shadow-2xl text-white/70 hover:text-white transition"
+        className="absolute top-4 left-0 z-[1000] bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-2 rounded-r-lg shadow-2xl text-slate-500 dark:text-white/70 hover:text-slate-800 dark:text-white transition"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           {isSidebarOpen ? <path d="M15 18l-6-6 6-6"/> : <path d="M9 18l6-6-6-6"/>}
@@ -1394,35 +1422,35 @@ function App() {
       {/* Feature Properties Editor Modal */}
       {editingFeature && (
         <div className="absolute inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-            <div className="px-5 py-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <h2 className="text-white font-semibold">Edit Feature Properties</h2>
-              <button onClick={() => setEditingFeature(null)} className="text-white/50 hover:text-white"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white/5">
+              <h2 className="text-slate-800 dark:text-white font-semibold">Edit Feature Properties</h2>
+              <button onClick={() => setEditingFeature(null)} className="text-slate-400 dark:text-white/50 hover:text-slate-800 dark:text-white"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
             </div>
             <form onSubmit={handleSaveProperties} className="p-5 flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-medium text-white/60 mb-1">Name</label>
+                <label className="block text-xs font-medium text-slate-800 dark:text-white/60 mb-1">Name</label>
                 <input 
                   type="text" 
                   value={editingFeature.properties?.name || ''} 
                   onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, name: e.target.value}}))}
-                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none transition"
+                  className="w-full bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-white focus:border-blue-500 outline-none transition"
                   placeholder="E.g., Central Park"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-white/60 mb-1">Description</label>
+                <label className="block text-xs font-medium text-slate-800 dark:text-white/60 mb-1">Description</label>
                 <textarea 
                   value={editingFeature.properties?.description || ''} 
                   onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, description: e.target.value}}))}
-                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none transition min-h-[80px]"
+                  className="w-full bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-white focus:border-blue-500 outline-none transition min-h-[80px]"
                   placeholder="Enter details about this location..."
                 />
               </div>
               {/* M17 Icon Picker for Points */}
               {editingFeature.geometry.type === 'Point' && (
                 <div className="mb-4">
-                  <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Point Icon</label>
+                  <label className="block text-xs font-semibold text-slate-400 dark:text-white/50 uppercase tracking-wider mb-2">Point Icon</label>
                   <div className="flex flex-wrap gap-2">
                     {Object.keys(ICON_SVGS).map((key) => (
                       <button
@@ -1431,8 +1459,8 @@ function App() {
                         onClick={() => setEditingFeature(prev => ({...prev, properties: {...prev.properties, icon: key}}))}
                         className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
                           (editingFeature.properties.icon || 'pin') === key
-                            ? 'border-blue-500 bg-blue-500/20 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]'
-                            : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
+                            ? 'border-blue-500 bg-blue-500/20 text-slate-800 dark:text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                            : 'border-slate-200 dark:border-white/10 bg-white/5 text-slate-400 dark:text-white/50 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-800 dark:text-white'
                         }`}
                         title={key.charAt(0).toUpperCase() + key.slice(1)}
                         dangerouslySetInnerHTML={{ __html: ICON_SVGS[key] }}
@@ -1442,24 +1470,24 @@ function App() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-medium text-white/60 mb-1">Color</label>
+                <label className="block text-xs font-medium text-slate-800 dark:text-white/60 mb-1">Color</label>
                 <div className="flex gap-2">
                   <input 
                     type="color" 
                     value={editingFeature.properties?.color || '#3b82f6'} 
                     onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, color: e.target.value}}))}
-                    className="h-9 w-14 bg-black/30 border border-white/10 rounded-lg cursor-pointer"
+                    className="h-9 w-14 bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg cursor-pointer"
                   />
                   <input 
                     type="text" 
                     value={editingFeature.properties?.color || '#3b82f6'} 
                     onChange={e => setEditingFeature(prev => ({...prev, properties: {...prev.properties, color: e.target.value}}))}
-                    className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none transition uppercase font-mono"
+                    className="flex-1 bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-white focus:border-blue-500 outline-none transition uppercase font-mono"
                   />
                 </div>
               </div>
               {(editingFeature.geometry.type === 'LineString' || editingFeature.geometry.type === 'MultiLineString') && (
-                <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10">
                   <button 
                     type="button"
                     onClick={() => { generateElevationProfile(editingFeature); setEditingFeature(null); }}
@@ -1472,7 +1500,7 @@ function App() {
                 </div>
               )}
               {(editingFeature.geometry.type === 'Polygon' || editingFeature.geometry.type === 'MultiPolygon') && (
-                <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10">
                   {!isSimulatingRunoff ? (
                     <button 
                       type="button"
@@ -1505,8 +1533,8 @@ function App() {
                 </div>
               )}
               <div className="mt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setEditingFeature(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 transition">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition shadow-lg shadow-blue-500/20">Save Changes</button>
+                <button type="button" onClick={() => setEditingFeature(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-slate-800 dark:text-white transition shadow-lg shadow-blue-500/20">Save Changes</button>
               </div>
             </form>
           </div>
@@ -1517,35 +1545,35 @@ function App() {
       <div className="absolute bottom-6 right-20 z-[1001] flex flex-col items-end pointer-events-none">
         
         {isChatOpen && (
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl w-80 h-96 mb-4 shadow-2xl flex flex-col overflow-hidden pointer-events-auto transform transition-all animate-in slide-in-from-bottom-5">
-            <div className="bg-white/10 px-4 py-3 border-b border-white/10 flex justify-between items-center">
+          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-300 dark:border-white/20 rounded-2xl w-80 h-96 mb-4 shadow-2xl flex flex-col overflow-hidden pointer-events-auto transform transition-all animate-in slide-in-from-bottom-5">
+            <div className="bg-white/10 px-4 py-3 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                <h3 className="text-white text-sm font-semibold tracking-wide">GIS Assistant</h3>
+                <h3 className="text-slate-800 dark:text-white text-sm font-semibold tracking-wide">GIS Assistant</h3>
               </div>
-              <button onClick={() => setIsChatOpen(false)} className="text-white/50 hover:text-white transition">
+              <button onClick={() => setIsChatOpen(false)} className="text-slate-400 dark:text-white/50 hover:text-slate-800 dark:text-white transition">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
               </button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
               {messages.map((msg, i) => (
-                <div key={i} className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white self-end rounded-br-sm' : 'bg-white/10 text-white/90 self-start rounded-bl-sm border border-white/5'}`}>
+                <div key={i} className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${msg.sender === 'user' ? 'bg-blue-600 text-slate-800 dark:text-white self-end rounded-br-sm' : 'bg-white/10 text-slate-800 dark:text-white/90 self-start rounded-bl-sm border border-slate-100 dark:border-white/5'}`}>
                   {msg.text}
                 </div>
               ))}
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-3 border-t border-white/10 bg-black/20 flex gap-2">
+            <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 dark:border-white/10 bg-black/20 flex gap-2">
               <input 
                 type="text" 
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 placeholder="Ask me to draw something..." 
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-500 transition-colors"
+                className="flex-1 bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-white placeholder-white/30 outline-none focus:border-blue-500 transition-colors"
               />
-              <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 flex items-center justify-center transition">
+              <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-slate-800 dark:text-white rounded-lg px-3 flex items-center justify-center transition">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               </button>
             </form>
@@ -1554,7 +1582,7 @@ function App() {
 
         <button 
           onClick={() => setIsChatOpen(!isChatOpen)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all transform hover:scale-105 active:scale-95 pointer-events-auto ${isChatOpen ? 'bg-slate-800 border border-white/20 text-white' : 'bg-gradient-to-tr from-blue-600 to-indigo-500 text-white'}`}
+          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all transform hover:scale-105 active:scale-95 pointer-events-auto ${isChatOpen ? 'bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/20 text-slate-800 dark:text-white' : 'bg-gradient-to-tr from-blue-600 to-indigo-500 text-slate-800 dark:text-white'}`}
         >
           {isChatOpen ? (
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
@@ -1566,8 +1594,8 @@ function App() {
 
       <main className="flex-1 relative z-0 flex">
       {/* Basemap Switcher Widget */}
-      <div className="absolute bottom-6 left-6 z-[1000] flex flex-col gap-1.5 bg-slate-900/70 backdrop-blur-md border border-white/10 p-2 rounded-xl shadow-2xl w-40 transition-all">
-        <div className="text-[9px] text-white/50 uppercase tracking-widest font-bold px-2 mb-1 flex items-center gap-1">
+      <div className="absolute bottom-6 left-6 z-[1000] flex flex-col gap-1.5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200 dark:border-white/10 p-2 rounded-xl shadow-2xl w-40 transition-all">
+        <div className="text-[9px] text-slate-400 dark:text-white/50 uppercase tracking-widest font-bold px-2 mb-1 flex items-center gap-1">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
           Map Style
         </div>
@@ -1575,7 +1603,7 @@ function App() {
           <button 
             key={key} 
             onClick={() => setActiveBasemap(key)}
-            className={`text-left px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 shadow-sm ${activeBasemap === key ? 'bg-blue-500 text-white border border-blue-400' : 'text-white/70 hover:bg-white/10 border border-transparent hover:text-white'}`}
+            className={`text-left px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 shadow-sm ${activeBasemap === key ? 'bg-blue-500 text-slate-800 dark:text-white border border-blue-400' : 'text-slate-500 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 border border-transparent hover:text-slate-800 dark:text-white'}`}
           >
             {mapConfig.name}
           </button>
@@ -1640,9 +1668,9 @@ function App() {
 
       {/* Boolean Operations Action Bar */}
       {selectedFeatureIds.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/90 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-300">
-          <div className="text-sm text-white/80 font-medium">
-            <span className="text-white font-bold">{selectedFeatureIds.length}</span> Features Selected
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <div className="text-sm text-slate-600 dark:text-white/80 font-medium">
+            <span className="text-slate-800 dark:text-white font-bold">{selectedFeatureIds.length}</span> Features Selected
           </div>
           <div className="h-4 w-px bg-white/20"></div>
           <button 
@@ -1663,13 +1691,13 @@ function App() {
 
       {/* Elevation Profile Panel */}
       {elevationData && (
-        <div className="absolute bottom-8 right-8 z-[1000] w-[500px] h-[300px] bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
+        <div className="absolute bottom-8 right-8 z-[1000] w-[500px] h-[300px] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/10 bg-white/5">
             <div className="flex items-center gap-2">
               <svg width="18" height="18" className="text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h20M5 20l4-8 5 4 8-12"/></svg>
-              <h3 className="text-white font-semibold text-sm">Elevation: {elevationData.featureName}</h3>
+              <h3 className="text-slate-800 dark:text-white font-semibold text-sm">Elevation: {elevationData.featureName}</h3>
             </div>
-            <button onClick={() => setElevationData(null)} className="text-white/50 hover:text-white/90">
+            <button onClick={() => setElevationData(null)} className="text-slate-400 dark:text-white/50 hover:text-slate-800 dark:text-white/90">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
           </div>
