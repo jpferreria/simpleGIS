@@ -21,6 +21,8 @@ A modern, full-stack Geographic Information System (GIS) built with React, Leafl
 - **Data Export & Import:** 
   - Import GeoJSON and KML files via Drag-and-Drop or the Import menu.
   - Export your map to GeoJSON, Markdown, or a high-resolution PNG snapshot.
+- **Heavy Rain Run-off Simulation:** Simulate and visualize water flow accumulation during heavy rain based on real-world elevation data (Mapzen Terrarium RGB tiles) and live precipitation data from the Open-Meteo API.
+- **Light & Dark Mode:** Fully cohesive Light and Dark modes. The application UI and map tiles (OSM for Light, Carto Dark Matter for Dark) synchronize automatically to match your chosen aesthetic.
 - **AI Chat Assistant:** A built-in LLM interface (Ollama) to help answer questions about the map or GIS concepts.
 - **Authentication:** Foundation built for GitHub OAuth.
 
